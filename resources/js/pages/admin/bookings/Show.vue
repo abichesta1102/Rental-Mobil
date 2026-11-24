@@ -1,6 +1,6 @@
 <script setup lang="ts">
 import { Head, Link, useForm } from '@inertiajs/vue3';
-import { onMounted, ref } from 'vue';
+import { computed, onMounted, ref } from 'vue';
 import ConfirmDialog from '@/components/ConfirmDialog.vue';
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
@@ -34,6 +34,34 @@ const assignForm = useForm({
 function submitAssign(): void {
     assignForm.post(`/admin/bookings/${props.booking.id}/assign-delivery`);
 }
+
+const pricePerDay = Number(props.booking.price_per_day);
+const lateFeePerHour = Number(props.booking.vehicle?.late_fee_per_hour || 0);
+
+const durationBreakdown = computed(() => {
+    const pickup = new Date(props.booking.pickup_at).getTime();
+    const ret = new Date(props.booking.return_at).getTime();
+    if (isNaN(pickup) || isNaN(ret) || ret <= pickup) {
+        return { days: props.booking.duration_days, extraHours: 0, basePrice: Number(props.booking.total_price), overtimeFee: 0 };
+    }
+    const totalMinutes = Math.ceil(Math.max(0, (ret - pickup) / 1000) / 60);
+    const totalHours = totalMinutes / 60;
+    if (totalHours <= 24) {
+        return { days: 1, extraHours: 0, basePrice: pricePerDay, overtimeFee: 0 };
+    }
+    const days = Math.floor(totalHours / 24);
+    const remainingMinutes = totalMinutes - (days * 24 * 60);
+    const extraHours = Math.ceil(remainingMinutes / 60);
+    if (extraHours >= 24) {
+        return { days: days + 1, extraHours: 0, basePrice: (days + 1) * pricePerDay, overtimeFee: 0 };
+    }
+    return {
+        days,
+        extraHours,
+        basePrice: days * pricePerDay,
+        overtimeFee: extraHours * lateFeePerHour,
+    };
+});
 
 // Dialog Konfirmasi State
 const confirmOpen = ref(false);
@@ -259,7 +287,12 @@ const statusVariant: Record<string, 'default' | 'secondary' | 'destructive' | 'o
                         </div>
                         <div class="rounded-lg bg-muted/40 p-3">
                             <span class="text-xs text-muted-foreground block">Durasi</span>
-                            <span class="font-bold text-base">{{ booking.duration_days }} Hari</span>
+                            <span class="font-bold text-sm">
+                                {{ durationBreakdown.days }} Hari
+                                <span v-if="durationBreakdown.extraHours > 0" class="text-xs text-amber-600 block">
+                                    +{{ durationBreakdown.extraHours }} Jam
+                                </span>
+                            </span>
                         </div>
                         <div class="rounded-lg bg-muted/40 p-3">
                             <span class="text-xs text-muted-foreground block">Total Sewa</span>
@@ -267,9 +300,14 @@ const statusVariant: Record<string, 'default' | 'secondary' | 'destructive' | 'o
                         </div>
                     </div>
 
-                    <div v-if="Number(booking.late_fee_total) > 0" class="mt-4 rounded-lg bg-destructive/10 p-3 text-destructive text-sm flex justify-between items-center">
-                        <span>Denda Keterlambatan:</span>
-                        <span class="font-bold">{{ rupiah(booking.late_fee_total) }}</span>
+                    <div v-if="durationBreakdown.extraHours > 0" class="mt-3 rounded-lg bg-amber-500/10 p-2.5 text-xs text-amber-700 dark:text-amber-300 flex justify-between items-center">
+                        <span>Rincian Sewa: Pokok ({{ rupiah(durationBreakdown.basePrice) }}) + Lebihan {{ durationBreakdown.extraHours }} jam ({{ rupiah(durationBreakdown.overtimeFee) }})</span>
+                        <span class="font-semibold">{{ rupiah(booking.total_price) }}</span>
+                    </div>
+
+                    <div v-if="Number(booking.late_fee_total) > 0" class="mt-3 rounded-lg bg-destructive/10 p-3 text-destructive text-sm flex justify-between items-center">
+                        <span>Denda Telat Pengembalian Unit:</span>
+                        <span class="font-bold">+{{ rupiah(booking.late_fee_total) }}</span>
                     </div>
                 </div>
 

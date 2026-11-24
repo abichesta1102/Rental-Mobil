@@ -342,8 +342,6 @@ const statusVariant: Record<string, 'default' | 'secondary' | 'destructive' | 'o
                             <span>Denda Kerusakan Unit:</span>
                             <span>+{{ rupiah(damagesTotal) }}</span>
                         </div>
-                            <span>{{ rupiah(damagesTotal) }}</span>
-                        </div>
 
                         <!-- Sisa Tagihan -->
                         <div v-if="['returned', 'completed'].includes(booking.status)" class="flex justify-between font-bold border-t pt-2 text-sm">

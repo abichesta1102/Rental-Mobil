@@ -191,11 +191,19 @@ function printInvoice() {
                 <!-- Grand Total Calculation -->
                 <div class="space-y-2">
                     <div class="flex justify-between text-muted-foreground text-xs">
-                        <span>Total Biaya Sewa</span>
+                        <span>Sewa Pokok ({{ durationBreakdown.days }} hari)</span>
+                        <span>{{ rupiah(durationBreakdown.basePrice) }}</span>
+                    </div>
+                    <div v-if="durationBreakdown.extraHours > 0" class="flex justify-between text-amber-600 dark:text-amber-400 text-xs">
+                        <span>Lebihan Jam (+{{ durationBreakdown.extraHours }} jam)</span>
+                        <span>+{{ rupiah(durationBreakdown.overtimeFee) }}</span>
+                    </div>
+                    <div class="flex justify-between text-xs font-medium border-t pt-1">
+                        <span>Total Biaya Sewa Pesanan</span>
                         <span>{{ rupiah(rentalTotal) }}</span>
                     </div>
                     <div v-if="lateFeeTotal > 0" class="flex justify-between text-rose-600 text-xs">
-                        <span>Total Denda Telat</span>
+                        <span>Total Denda Telat Pengembalian</span>
                         <span>+{{ rupiah(lateFeeTotal) }}</span>
                     </div>
                     <div v-if="damagesTotal > 0" class="flex justify-between text-rose-600 text-xs">
