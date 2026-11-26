@@ -2,9 +2,11 @@
 import { Head, Link, useForm } from '@inertiajs/vue3';
 import { computed } from 'vue';
 import InputError from '@/components/InputError.vue';
+import PageHeader from '@/components/PageHeader.vue';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
+import { Spinner } from '@/components/ui/spinner';
 
 interface Vehicle {
     id: number;
@@ -30,7 +32,7 @@ defineOptions({
     layout: {
         breadcrumbs: [
             { title: 'Kendaraan', href: '/admin/vehicles' },
-            { title: 'Form', href: '#' },
+            { title: 'Form Kendaraan', href: '#' },
         ],
     },
 });
@@ -57,7 +59,6 @@ function onPhotoChange(event: Event): void {
 
 function submit(): void {
     if (props.vehicle) {
-        // Upload file butuh POST, jadi PUT "dipalsukan" lewat _method
         form.transform((data) => ({ ...data, _method: 'put' })).post(
             `/admin/vehicles/${props.vehicle.id}`,
             { forceFormData: true },
@@ -68,60 +69,62 @@ function submit(): void {
 }
 
 const selectClass =
-    'border-input bg-background h-9 w-full rounded-md border px-3 text-sm shadow-xs outline-none focus-visible:ring-[3px] focus-visible:ring-ring/50';
+    'border border-input bg-background h-10 min-h-[40px] w-full rounded-[6px] px-3 text-sm shadow-none outline-none focus-visible:ring-[2px] focus-visible:ring-ring';
 </script>
 
 <template>
-    <Head :title="isEdit ? 'Ubah Kendaraan' : 'Tambah Kendaraan'" />
+    <Head :title="isEdit ? 'Ubah Data Kendaraan' : 'Tambah Kendaraan Baru'" />
 
-    <div class="mx-auto flex w-full max-w-3xl flex-col gap-6 p-4">
-        <div>
-            <h1 class="text-xl font-semibold">
-                {{ isEdit ? 'Ubah Kendaraan' : 'Tambah Kendaraan' }}
-            </h1>
-            <p class="text-sm text-muted-foreground">
-                Harga sewa dan denda keterlambatan per jam akan dipakai untuk menghitung tagihan.
-            </p>
-        </div>
+    <div class="mx-auto flex w-full max-w-3xl flex-col gap-6 p-4 sm:p-6">
+        <PageHeader
+            :title="isEdit ? 'Ubah Data Kendaraan' : 'Tambah Kendaraan Baru'"
+            description="Lengkapi detail spesifikasi, tarif sewa harian, dan ketentuan denda keterlambatan."
+        >
+            <template #actions>
+                <Button as-child variant="outline" size="sm">
+                    <Link href="/admin/vehicles">Kembali ke Daftar</Link>
+                </Button>
+            </template>
+        </PageHeader>
 
-        <form class="grid gap-4 sm:grid-cols-2" @submit.prevent="submit">
+        <form class="grid gap-4 sm:grid-cols-2 rounded-[6px] border border-border bg-card p-5" @submit.prevent="submit">
             <div class="grid gap-2">
-                <Label for="plate">Plat nomor</Label>
-                <Input id="plate" v-model="form.plate" placeholder="L 1234 WU" />
+                <Label for="plate">Plat Nomor</Label>
+                <Input id="plate" v-model="form.plate" placeholder="Contoh: L 1234 WU" class="font-mono" />
                 <InputError :message="form.errors.plate" />
             </div>
 
             <div class="grid gap-2">
-                <Label for="status">Status</Label>
+                <Label for="status">Status Unit</Label>
                 <select id="status" v-model="form.status" :class="selectClass">
-                    <option value="available">Tersedia</option>
-                    <option value="maintenance">Perawatan</option>
+                    <option value="available">Tersedia (Ready)</option>
+                    <option value="maintenance">Perawatan (Bengkel)</option>
                     <option value="inactive">Nonaktif</option>
                 </select>
                 <InputError :message="form.errors.status" />
             </div>
 
             <div class="grid gap-2">
-                <Label for="brand">Merek</Label>
-                <Input id="brand" v-model="form.brand" placeholder="Honda" />
+                <Label for="brand">Merek Kendaraan</Label>
+                <Input id="brand" v-model="form.brand" placeholder="Contoh: Toyota, Honda" />
                 <InputError :message="form.errors.brand" />
             </div>
 
             <div class="grid gap-2">
-                <Label for="model">Tipe</Label>
-                <Input id="model" v-model="form.model" placeholder="Brio RS" />
+                <Label for="model">Model / Tipe</Label>
+                <Input id="model" v-model="form.model" placeholder="Contoh: Avanza G, Brio RS" />
                 <InputError :message="form.errors.model" />
             </div>
 
             <div class="grid gap-2">
-                <Label for="year">Tahun</Label>
-                <Input id="year" v-model="form.year" type="number" placeholder="2022" />
+                <Label for="year">Tahun Pembuatan</Label>
+                <Input id="year" v-model="form.year" type="number" placeholder="2023" />
                 <InputError :message="form.errors.year" />
             </div>
 
             <div class="grid gap-2">
-                <Label for="color">Warna</Label>
-                <Input id="color" v-model="form.color" placeholder="Putih" />
+                <Label for="color">Warna Kendaraan</Label>
+                <Input id="color" v-model="form.color" placeholder="Contoh: Putih, Hitam Metalik" />
                 <InputError :message="form.errors.color" />
             </div>
 
@@ -135,49 +138,51 @@ const selectClass =
             </div>
 
             <div class="grid gap-2">
-                <Label for="seats">Jumlah kursi</Label>
-                <Input id="seats" v-model="form.seats" type="number" />
+                <Label for="seats">Kapasitas Kursi</Label>
+                <Input id="seats" v-model="form.seats" type="number" placeholder="5" />
                 <InputError :message="form.errors.seats" />
             </div>
 
             <div class="grid gap-2">
-                <Label for="price_per_day">Harga sewa per hari (Rp)</Label>
+                <Label for="price_per_day">Tarif Sewa Per Hari (Rp)</Label>
                 <Input id="price_per_day" v-model="form.price_per_day" type="number" placeholder="350000" />
                 <InputError :message="form.errors.price_per_day" />
             </div>
 
             <div class="grid gap-2">
-                <Label for="late_fee_per_hour">Denda telat per jam (Rp)</Label>
+                <Label for="late_fee_per_hour">Denda Keterlambatan Per Jam (Rp)</Label>
                 <Input id="late_fee_per_hour" v-model="form.late_fee_per_hour" type="number" placeholder="50000" />
                 <InputError :message="form.errors.late_fee_per_hour" />
             </div>
 
-            <div class="grid gap-2">
-                <Label for="purchase_price">Harga beli kendaraan (Rp)</Label>
+            <div class="grid gap-2 sm:col-span-2">
+                <Label for="purchase_price">Harga Beli Kendaraan (Rp) - Opsional</Label>
                 <Input id="purchase_price" v-model="form.purchase_price" type="number" placeholder="200000000" />
                 <InputError :message="form.errors.purchase_price" />
             </div>
 
             <div class="grid gap-2 sm:col-span-2">
-                <Label for="photo">Foto kendaraan (maks. 2 MB)</Label>
-                <img
-                    v-if="vehicle?.photo_url"
-                    :src="vehicle.photo_url"
-                    alt="Foto saat ini"
-                    class="h-32 w-52 rounded-md object-cover"
-                />
-                <Input id="photo" type="file" accept="image/*" @change="onPhotoChange" />
+                <Label for="photo">Foto Unit Kendaraan</Label>
+                <div v-if="vehicle?.photo_url" class="mb-2">
+                    <img
+                        :src="vehicle.photo_url"
+                        alt="Foto unit"
+                        class="h-28 w-44 rounded-[6px] object-cover border border-border"
+                    />
+                </div>
+                <Input id="photo" type="file" accept="image/*" @change="onPhotoChange" class="cursor-pointer" />
                 <p v-if="isEdit" class="text-xs text-muted-foreground">
-                    Kosongkan jika tidak ingin mengganti foto.
+                    Biarkan kosong bila tidak ingin mengganti foto.
                 </p>
                 <InputError :message="form.errors.photo" />
             </div>
 
-            <div class="flex gap-2 sm:col-span-2">
-                <Button type="submit" :disabled="form.processing">
-                    {{ form.processing ? 'Menyimpan...' : 'Simpan' }}
+            <div class="flex flex-wrap items-center gap-3 pt-4 sm:col-span-2 border-t border-border">
+                <Button type="submit" :disabled="form.processing" class="h-10 min-h-[40px] px-5">
+                    <Spinner v-if="form.processing" class="mr-2" />
+                    {{ form.processing ? 'Menyimpan...' : 'Simpan Kendaraan' }}
                 </Button>
-                <Button as-child variant="outline" type="button">
+                <Button as-child variant="outline" type="button" class="h-10 min-h-[40px]">
                     <Link href="/admin/vehicles">Batal</Link>
                 </Button>
             </div>

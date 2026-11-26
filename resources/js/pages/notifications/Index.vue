@@ -1,6 +1,8 @@
 <script setup lang="ts">
-import { Head, Link, router } from '@inertiajs/vue3';
-import { Bell, CheckCheck, Clock, ExternalLink } from '@lucide/vue';
+import { Head, router } from '@inertiajs/vue3';
+import { Bell, CheckCheck, Clock } from '@lucide/vue';
+import EmptyState from '@/components/EmptyState.vue';
+import PageHeader from '@/components/PageHeader.vue';
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
 import { formatDateTime } from '@/lib/format';
@@ -38,11 +40,11 @@ defineOptions({
     },
 });
 
-function markAllAsRead() {
+function markAllAsRead(): void {
     router.post('/notifications/read-all');
 }
 
-function markAsRead(id: string, url?: string) {
+function markAsRead(id: string, url?: string): void {
     if (url) {
         router.post(`/notifications/${id}/read`, { redirect: true });
     } else {
@@ -54,101 +56,53 @@ function markAsRead(id: string, url?: string) {
 <template>
     <Head title="Daftar Notifikasi" />
 
-    <div class="space-y-6 p-6">
-        <div class="flex items-center justify-between">
-            <div>
-                <h1 class="text-2xl font-bold tracking-tight">Notifikasi</h1>
-                <p class="text-sm text-muted-foreground">
-                    Semua pemberitahuan dan aktivitas terkait akun Anda.
-                </p>
-            </div>
-            <div>
-                <Button variant="outline" size="sm" @click="markAllAsRead">
-                    <CheckCheck class="mr-2 h-4 w-4" />
+    <div class="flex flex-col gap-6 p-4 sm:p-6 max-w-4xl mx-auto w-full">
+        <PageHeader
+            title="Notifikasi"
+            description="Pemberitahuan aktivitas pemesanan, verifikasi pembayaran, dan tugas operasional."
+        >
+            <template #actions>
+                <Button variant="outline" size="sm" class="h-9 min-h-[36px]" @click="markAllAsRead">
+                    <CheckCheck class="mr-1.5 size-4" />
                     Tandai Semua Dibaca
                 </Button>
-            </div>
-        </div>
+            </template>
+        </PageHeader>
 
-        <div v-if="notifications.data.length === 0" class="flex flex-col items-center justify-center rounded-lg border border-dashed py-12 text-center">
-            <Bell class="h-10 w-10 text-muted-foreground/60" />
-            <h3 class="mt-4 text-base font-semibold">Belum Ada Notifikasi</h3>
-            <p class="mt-1 text-sm text-muted-foreground">Anda belum menerima notifikasi apa pun saat ini.</p>
+        <div v-if="notifications.data.length === 0" class="rounded-[6px] border border-border bg-card p-6">
+            <EmptyState
+                title="Belum ada notifikasi"
+                description="Anda belum menerima pemberitahuan apa pun saat ini."
+                :icon="Bell"
+            />
         </div>
 
         <div v-else class="space-y-3">
             <div
                 v-for="item in notifications.data"
                 :key="item.id"
-                class="flex items-start justify-between gap-4 rounded-lg border p-4 transition-colors"
-                :class="item.read_at ? 'bg-background' : 'bg-muted/40 border-primary/30'"
+                class="flex items-start justify-between gap-4 rounded-[6px] border p-4 transition-colors cursor-pointer"
+                :class="item.read_at ? 'bg-card border-border' : 'bg-muted/40 border-primary/40'"
+                @click="markAsRead(item.id, item.data.url)"
             >
                 <div class="space-y-1">
                     <div class="flex items-center gap-2">
-                        <span class="font-semibold text-foreground">
+                        <span class="font-semibold text-xs text-foreground">
                             {{ item.data.title || 'Pemberitahuan' }}
                         </span>
-                        <Badge v-if="!item.read_at" variant="default" class="text-xs">
+                        <Badge v-if="!item.read_at" variant="default" class="text-[10px] px-1.5 py-0 rounded-[4px]">
                             Baru
                         </Badge>
                     </div>
-                    <p class="text-sm text-muted-foreground">
+                    <p class="text-xs text-muted-foreground leading-normal">
                         {{ item.data.message }}
                     </p>
-                    <div class="flex items-center gap-1 text-xs text-muted-foreground/80">
-                        <Clock class="h-3.5 w-3.5" />
+                    <div class="flex items-center gap-1 text-[11px] text-muted-foreground pt-1">
+                        <Clock class="size-3" />
                         <span>{{ formatDateTime(item.created_at) }}</span>
                     </div>
                 </div>
-
-                <div class="flex items-center gap-2 shrink-0">
-                    <Button
-                        v-if="!item.read_at"
-                        variant="ghost"
-                        size="sm"
-                        @click="markAsRead(item.id)"
-                    >
-                        Tandai Dibaca
-                    </Button>
-                    <Button
-                        v-if="item.data.url"
-                        variant="outline"
-                        size="sm"
-                        @click="markAsRead(item.id, item.data.url)"
-                    >
-                        <ExternalLink class="mr-1 h-3.5 w-3.5" />
-                        Buka
-                    </Button>
-                </div>
             </div>
-        </div>
-
-        <div v-if="notifications.last_page > 1" class="flex items-center justify-between pt-4">
-            <Button
-                variant="outline"
-                size="sm"
-                :disabled="!notifications.prev_page_url"
-                as-child
-            >
-                <Link v-if="notifications.prev_page_url" :href="notifications.prev_page_url">
-                    Sebelumnya
-                </Link>
-                <span v-else>Sebelumnya</span>
-            </Button>
-            <span class="text-xs text-muted-foreground">
-                Halaman {{ notifications.current_page }} dari {{ notifications.last_page }}
-            </span>
-            <Button
-                variant="outline"
-                size="sm"
-                :disabled="!notifications.next_page_url"
-                as-child
-            >
-                <Link v-if="notifications.next_page_url" :href="notifications.next_page_url">
-                    Berikutnya
-                </Link>
-                <span v-else>Berikutnya</span>
-            </Button>
         </div>
     </div>
 </template>

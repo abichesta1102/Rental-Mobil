@@ -50,13 +50,13 @@ function onConfirm(): void {
                 <div class="flex items-center gap-3">
                     <div
                         v-if="variant === 'destructive'"
-                        class="flex h-10 w-10 shrink-0 items-center justify-center rounded-full bg-red-100 text-red-600 dark:bg-red-950 dark:text-red-400"
+                        class="flex h-10 w-10 shrink-0 items-center justify-center rounded-[6px] bg-red-100 text-red-600 dark:bg-red-950 dark:text-red-400"
                     >
                         <AlertTriangle class="h-5 w-5" />
                     </div>
                     <div
                         v-else
-                        class="flex h-10 w-10 shrink-0 items-center justify-center rounded-full bg-primary/10 text-primary"
+                        class="flex h-10 w-10 shrink-0 items-center justify-center rounded-[6px] bg-primary/10 text-primary"
                     >
                         <Info class="h-5 w-5" />
                     </div>

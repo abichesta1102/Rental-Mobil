@@ -19,7 +19,7 @@ defineOptions({
     layout: {
         breadcrumbs: [
             {
-                title: 'Security settings',
+                title: 'Pengaturan Keamanan',
                 href: edit(),
             },
         ],
@@ -28,15 +28,15 @@ defineOptions({
 </script>
 
 <template>
-    <Head title="Security settings" />
+    <Head title="Pengaturan Keamanan" />
 
-    <h1 class="sr-only">Security settings</h1>
+    <h1 class="sr-only">Pengaturan Keamanan</h1>
 
     <div class="space-y-6">
         <Heading
             variant="small"
-            title="Update password"
-            description="Ensure your account is using a long, random password to stay secure"
+            title="Perbarui Kata Sandi"
+            description="Pastikan akun Anda menggunakan kata sandi yang kuat dan aman"
         />
 
         <Form
@@ -54,38 +54,38 @@ defineOptions({
             v-slot="{ errors, processing }"
         >
             <div class="grid gap-2">
-                <Label for="current_password">Current password</Label>
+                <Label for="current_password">Kata Sandi Saat Ini</Label>
                 <PasswordInput
                     id="current_password"
                     name="current_password"
-                    class="mt-1 block w-full"
+                    class="mt-1 block w-full rounded-[6px]"
                     autocomplete="current-password"
-                    placeholder="Current password"
+                    placeholder="Kata sandi saat ini"
                 />
                 <InputError :message="errors.current_password" />
             </div>
 
             <div class="grid gap-2">
-                <Label for="password">New password</Label>
+                <Label for="password">Kata Sandi Baru</Label>
                 <PasswordInput
                     id="password"
                     name="password"
-                    class="mt-1 block w-full"
+                    class="mt-1 block w-full rounded-[6px]"
                     autocomplete="new-password"
-                    placeholder="New password"
+                    placeholder="Kata sandi baru"
                     :passwordrules="props.passwordRules"
                 />
                 <InputError :message="errors.password" />
             </div>
 
             <div class="grid gap-2">
-                <Label for="password_confirmation">Confirm password</Label>
+                <Label for="password_confirmation">Konfirmasi Kata Sandi Baru</Label>
                 <PasswordInput
                     id="password_confirmation"
                     name="password_confirmation"
-                    class="mt-1 block w-full"
+                    class="mt-1 block w-full rounded-[6px]"
                     autocomplete="new-password"
-                    placeholder="Confirm password"
+                    placeholder="Konfirmasi kata sandi baru"
                     :passwordrules="props.passwordRules"
                 />
                 <InputError :message="errors.password_confirmation" />
@@ -95,8 +95,9 @@ defineOptions({
                 <Button
                     :disabled="processing"
                     data-test="update-password-button"
+                    class="rounded-[6px] min-h-[40px]"
                 >
-                    Save
+                    Simpan Kata Sandi
                 </Button>
             </div>
         </Form>

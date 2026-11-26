@@ -2,11 +2,16 @@
 import { Head, Link, useForm } from '@inertiajs/vue3';
 import { computed, onMounted, ref } from 'vue';
 import ConfirmDialog from '@/components/ConfirmDialog.vue';
-import { Badge } from '@/components/ui/badge';
+import EmptyState from '@/components/EmptyState.vue';
+import InputError from '@/components/InputError.vue';
+import PageHeader from '@/components/PageHeader.vue';
+import StatusBadge from '@/components/StatusBadge.vue';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
+import { Spinner } from '@/components/ui/spinner';
 import { formatDateTime, rupiah } from '@/lib/format';
+import { getStatusLabel } from '@/lib/status';
 import L from 'leaflet';
 import 'leaflet/dist/leaflet.css';
 
@@ -109,7 +114,7 @@ function verifyPayment(paymentId: number, action: 'verify' | 'reject'): void {
 function cancelBooking(): void {
     requestConfirm({
         title: 'Batalkan Booking',
-        description: `Apakah Anda yakin ingin MEMBATALKAN booking ${props.booking.booking_code}? Booking yang dibatalkan tidak dapat diproses lagi dan slot kendaraan akan dibebaskan.`,
+        description: `Apakah Anda yakin ingin MEMBATALKAN booking ${props.booking.booking_code}? Booking yang dibatalkan tidak dapat diproses lagi dan unit kendaraan akan dibebaskan.`,
         variant: 'destructive',
         confirmText: 'Ya, Batalkan Booking',
         onConfirm: () => {
@@ -129,327 +134,361 @@ function submitDamage(): void {
     });
 }
 
-const statusLabel: Record<string, string> = {
-    pending_dp: 'Menunggu DP',
-    booked: 'Terkonfirmasi',
-    assigned: 'Siap Kirim',
-    delivering: 'Sedang Dikirim',
-    on_rent: 'Sedang Disewa',
-    returned: 'Kembali (Cek Denda)',
-    completed: 'Selesai',
-    cancelled: 'Dibatalkan',
-};
-
-// Leaflet map init setelah DOM tersedia
+// Leaflet map init tanpa CDN eksternal (menggunakan divIcon lokal)
 const mapEl = ref<HTMLElement | null>(null);
 onMounted(() => {
     const log = props.booking.location_logs?.[0];
     if (!log || !mapEl.value) return;
-    // Fix default icon path issue dengan Vite
-    delete (L.Icon.Default.prototype as any)._getIconUrl;
-    L.Icon.Default.mergeOptions({
-        iconUrl: 'https://unpkg.com/leaflet@1.9.4/dist/images/marker-icon.png',
-        iconRetinaUrl: 'https://unpkg.com/leaflet@1.9.4/dist/images/marker-icon-2x.png',
-        shadowUrl: 'https://unpkg.com/leaflet@1.9.4/dist/images/marker-shadow.png',
-    });
+
     const map = L.map(mapEl.value).setView([log.lat, log.lng], 15);
     L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', {
-        attribution: '© OpenStreetMap',
+        attribution: '&copy; OpenStreetMap',
     }).addTo(map);
-    L.marker([log.lat, log.lng]).addTo(map)
-        .bindPopup(`📍 Lokasi terakhir: ${log.lat}, ${log.lng}`)
+
+    const pinIcon = L.divIcon({
+        className: 'custom-map-marker',
+        html: `<div style="width:14px;height:14px;background:#c2410c;border:2px solid #ffffff;border-radius:50%;box-shadow:0 1px 3px rgba(0,0,0,0.3);"></div>`,
+        iconSize: [14, 14],
+        iconAnchor: [7, 7],
+    });
+
+    L.marker([log.lat, log.lng], { icon: pinIcon }).addTo(map)
+        .bindPopup(`Titik Lokasi Terakhir: ${log.lat}, ${log.lng}`)
         .openPopup();
 });
-
-const statusVariant: Record<string, 'default' | 'secondary' | 'destructive' | 'outline'> = {
-    pending_dp: 'secondary',
-    booked: 'default',
-    assigned: 'default',
-    delivering: 'default',
-    on_rent: 'default',
-    returned: 'outline',
-    completed: 'outline',
-    cancelled: 'destructive',
-};
 </script>
 
 <template>
     <Head :title="`Booking ${booking.booking_code}`" />
 
-    <div class="flex flex-col gap-6 p-4">
-        <!-- Top bar -->
-        <div class="flex flex-col justify-between gap-3 sm:flex-row sm:items-center">
-            <div>
-                <div class="flex items-center gap-3">
-                    <h1 class="text-2xl font-bold font-mono">{{ booking.booking_code }}</h1>
-                    <Badge :variant="statusVariant[booking.status] ?? 'outline'">
-                        {{ statusLabel[booking.status] ?? booking.status }}
-                    </Badge>
-                </div>
-                <p class="text-sm text-muted-foreground mt-1">
-                    Dibuat pada {{ formatDateTime(booking.created_at) }}
-                </p>
-            </div>
-            <div class="flex items-center gap-2">
+    <div class="flex flex-col gap-6 p-4 sm:p-6">
+        <PageHeader
+            :title="`Booking ${booking.booking_code}`"
+            :description="`Dibuat pada ${formatDateTime(booking.created_at)} &middot; Status: ${getStatusLabel(booking.status)}`"
+        >
+            <template #actions>
+                <StatusBadge :status="booking.status" class="mr-2" />
                 <Button
                     v-if="!['completed', 'cancelled', 'on_rent'].includes(booking.status)"
                     variant="destructive"
                     size="sm"
+                    class="h-9 min-h-[36px]"
                     @click="cancelBooking"
                 >
                     Batalkan Booking
                 </Button>
-                <Button as-child variant="outline">
+                <Button as-child variant="outline" size="sm" class="h-9 min-h-[36px]">
                     <Link href="/admin/bookings">Kembali ke Daftar</Link>
                 </Button>
-            </div>
-        </div>
+            </template>
+        </PageHeader>
 
         <div class="grid gap-6 lg:grid-cols-3">
             <!-- Kolom Kiri: Informasi Pelanggan & Kendaraan -->
             <div class="flex flex-col gap-6 lg:col-span-1">
                 <!-- Info Pelanggan -->
-                <div class="rounded-xl border bg-card p-5 shadow-xs">
-                    <h2 class="text-base font-semibold mb-3">Informasi Pelanggan</h2>
-                    <div class="flex flex-col gap-2 text-sm">
+                <div class="rounded-[6px] border border-border bg-card p-4">
+                    <h2 class="text-sm font-semibold tracking-tight text-foreground mb-3 pb-2 border-b border-border">
+                        Informasi Pelanggan
+                    </h2>
+                    <div class="space-y-2.5 text-xs">
                         <div>
-                            <span class="text-xs text-muted-foreground block">Nama Lengkap</span>
-                            <span class="font-medium">{{ booking.user?.name }}</span>
-                            <Badge v-if="booking.user?.is_blacklisted" variant="destructive" class="ml-2 text-[10px]">
-                                Blacklisted
-                            </Badge>
+                            <span class="text-muted-foreground block text-[11px]">Nama Lengkap</span>
+                            <div class="flex items-center gap-2 mt-0.5">
+                                <span class="font-medium text-foreground">{{ booking.user?.name }}</span>
+                                <StatusBadge v-if="booking.user?.is_blacklisted" status="blacklisted" class="scale-90 origin-left" />
+                            </div>
                         </div>
                         <div>
-                            <span class="text-xs text-muted-foreground block">Nomor HP / WhatsApp</span>
-                            <span class="font-medium">{{ booking.user?.phone ?? '-' }}</span>
+                            <span class="text-muted-foreground block text-[11px]">Nomor Telepon</span>
+                            <span class="font-medium text-foreground">{{ booking.user?.phone ?? '-' }}</span>
                         </div>
                         <div>
-                            <span class="text-xs text-muted-foreground block">Email</span>
-                            <span class="font-medium">{{ booking.user?.email }}</span>
+                            <span class="text-muted-foreground block text-[11px]">Email</span>
+                            <span class="font-medium text-foreground">{{ booking.user?.email }}</span>
                         </div>
                         <div>
-                            <span class="text-xs text-muted-foreground block">Alamat Pengiriman Unit</span>
-                            <span class="font-medium">{{ booking.delivery_address }}</span>
+                            <span class="text-muted-foreground block text-[11px]">Alamat Pengiriman Unit</span>
+                            <span class="font-medium text-foreground leading-normal">{{ booking.delivery_address }}</span>
                         </div>
                         <div>
-                            <span class="text-xs text-muted-foreground block">Kota / Wilayah Tujuan</span>
-                            <span class="font-medium">{{ booking.destination }}</span>
+                            <span class="text-muted-foreground block text-[11px]">Kota / Wilayah Tujuan</span>
+                            <span class="font-medium text-foreground">{{ booking.destination }}</span>
                         </div>
                     </div>
                 </div>
 
                 <!-- Info Kendaraan -->
-                <div class="rounded-xl border bg-card p-5 shadow-xs">
-                    <h2 class="text-base font-semibold mb-3">Unit Kendaraan</h2>
+                <div class="rounded-[6px] border border-border bg-card p-4">
+                    <h2 class="text-sm font-semibold tracking-tight text-foreground mb-3 pb-2 border-b border-border">
+                        Unit Kendaraan
+                    </h2>
                     <img
                         v-if="booking.vehicle?.photo_url"
                         :src="booking.vehicle?.photo_url"
                         :alt="booking.vehicle?.model"
-                        class="aspect-video w-full rounded-lg object-cover mb-3"
+                        class="aspect-video w-full rounded-[4px] object-cover border border-border mb-3"
                     />
-                    <div class="flex flex-col gap-2 text-sm">
-                        <div class="font-semibold text-base">{{ booking.vehicle?.brand }} {{ booking.vehicle?.model }}</div>
-                        <div class="text-muted-foreground">Plat: <span class="font-mono text-foreground font-semibold">{{ booking.vehicle?.plate }}</span></div>
-                        <div class="text-muted-foreground">Tarif: {{ rupiah(booking.price_per_day) }} / hari</div>
-                        <div class="text-muted-foreground">Denda Telat: {{ rupiah(booking.vehicle?.late_fee_per_hour) }} / jam</div>
+                    <div class="space-y-2 text-xs">
+                        <div class="flex justify-between">
+                            <span class="text-muted-foreground">Unit:</span>
+                            <span class="font-medium text-foreground">{{ booking.vehicle?.brand }} {{ booking.vehicle?.model }}</span>
+                        </div>
+                        <div class="flex justify-between">
+                            <span class="text-muted-foreground">Plat Nomor:</span>
+                            <span class="font-mono font-medium text-foreground">{{ booking.vehicle?.plate }}</span>
+                        </div>
+                        <div class="flex justify-between">
+                            <span class="text-muted-foreground">Tarif Sewa:</span>
+                            <span class="font-medium text-foreground">{{ rupiah(pricePerDay) }} / hari</span>
+                        </div>
+                        <div class="flex justify-between">
+                            <span class="text-muted-foreground">Denda Telat:</span>
+                            <span class="font-medium text-foreground">{{ rupiah(lateFeePerHour) }} / jam</span>
+                        </div>
                     </div>
                 </div>
 
-                <!-- Lokasi Terakhir (GPS) -->
-                <div v-if="booking.location_logs && booking.location_logs.length > 0" class="rounded-xl border bg-card p-5 shadow-xs">
-                    <h2 class="text-base font-semibold mb-2">Lokasi Terakhir Pelanggan (GPS)</h2>
-                    <p class="text-xs text-muted-foreground mb-3">Dicatat: {{ formatDateTime(booking.location_logs[0].recorded_at) }}</p>
-                    <!-- Peta Mini Leaflet/OpenStreetMap -->
-                    <div ref="mapEl" class="rounded-lg border overflow-hidden" style="height:200px;width:100%;"></div>
-                    <a
-                        :href="`https://www.google.com/maps?q=${booking.location_logs[0].lat},${booking.location_logs[0].lng}`"
-                        target="_blank"
-                        class="mt-3 inline-block text-xs font-semibold text-primary underline"
-                    >
-                        Buka di Google Maps ↗
-                    </a>
+                <!-- Penugasan Pegawai Pengirim -->
+                <div class="rounded-[6px] border border-border bg-card p-4">
+                    <h2 class="text-sm font-semibold tracking-tight text-foreground mb-3 pb-2 border-b border-border">
+                        Petugas Pengiriman
+                    </h2>
+
+                    <form class="space-y-3" @submit.prevent="submitAssign">
+                        <div>
+                            <Label for="employee" class="text-xs">Pilih Pegawai</Label>
+                            <select
+                                id="employee"
+                                v-model="assignForm.employee_id"
+                                class="h-10 min-h-[40px] w-full rounded-[6px] border border-input bg-background px-3 text-xs outline-none focus-visible:ring-[2px] focus-visible:ring-ring mt-1"
+                            >
+                                <option value="" disabled>-- Pilih Pegawai --</option>
+                                <option
+                                    v-for="emp in employees"
+                                    :key="emp.id"
+                                    :value="emp.id"
+                                >
+                                    {{ emp.name }} ({{ emp.active_tasks }} tugas aktif)
+                                </option>
+                            </select>
+                            <InputError :message="assignForm.errors.employee_id" />
+                        </div>
+
+                        <div>
+                            <Label for="notes" class="text-xs">Catatan Instruksi</Label>
+                            <Input
+                                id="notes"
+                                v-model="assignForm.notes"
+                                placeholder="Contoh: Unit siap kirim pukul 08.00 WIB"
+                                class="h-10 min-h-[40px] text-xs mt-1"
+                            />
+                            <InputError :message="assignForm.errors.notes" />
+                        </div>
+
+                        <Button
+                            type="submit"
+                            size="sm"
+                            class="w-full h-10 min-h-[40px]"
+                            :disabled="assignForm.processing"
+                        >
+                            <Spinner v-if="assignForm.processing" class="mr-2" />
+                            {{ booking.delivery ? 'Perbarui Petugas' : 'Tugaskan Pegawai' }}
+                        </Button>
+                    </form>
                 </div>
             </div>
 
-            <!-- Kolom Tengah & Kanan: Rincian Jadwal, Pembayaran, Pengiriman -->
+            <!-- Kolom Kanan: Rincian Keuangan, Pembayaran, Pelacakan -->
             <div class="flex flex-col gap-6 lg:col-span-2">
-                <!-- Rincian Biaya & Jadwal -->
-                <div class="rounded-xl border bg-card p-5 shadow-xs">
-                    <h2 class="text-base font-semibold mb-4">Rincian Sewa & Biaya</h2>
-                    <div class="grid grid-cols-2 gap-4 text-sm sm:grid-cols-4">
-                        <div class="rounded-lg bg-muted/40 p-3">
-                            <span class="text-xs text-muted-foreground block">Ambil Unit</span>
-                            <span class="font-medium text-xs">{{ formatDateTime(booking.pickup_at) }}</span>
+                <!-- Rincian Biaya -->
+                <div class="rounded-[6px] border border-border bg-card p-4">
+                    <h2 class="text-sm font-semibold tracking-tight text-foreground mb-3 pb-2 border-b border-border">
+                        Rincian Durasi & Biaya Sewa
+                    </h2>
+                    <div class="grid gap-3 sm:grid-cols-2 text-xs">
+                        <div>
+                            <span class="text-muted-foreground block text-[11px]">Waktu Pengambilan</span>
+                            <span class="font-medium text-foreground">{{ formatDateTime(booking.pickup_at) }}</span>
                         </div>
-                        <div class="rounded-lg bg-muted/40 p-3">
-                            <span class="text-xs text-muted-foreground block">Rencana Kembali</span>
-                            <span class="font-medium text-xs">{{ formatDateTime(booking.return_at) }}</span>
-                        </div>
-                        <div class="rounded-lg bg-muted/40 p-3">
-                            <span class="text-xs text-muted-foreground block">Durasi</span>
-                            <span class="font-bold text-sm">
-                                {{ durationBreakdown.days }} Hari
-                                <span v-if="durationBreakdown.extraHours > 0" class="text-xs text-amber-600 block">
-                                    +{{ durationBreakdown.extraHours }} Jam
-                                </span>
-                            </span>
-                        </div>
-                        <div class="rounded-lg bg-muted/40 p-3">
-                            <span class="text-xs text-muted-foreground block">Total Sewa</span>
-                            <span class="font-bold text-base text-primary">{{ rupiah(booking.total_price) }}</span>
+                        <div>
+                            <span class="text-muted-foreground block text-[11px]">Waktu Pengembalian Dijadwalkan</span>
+                            <span class="font-medium text-foreground">{{ formatDateTime(booking.return_at) }}</span>
                         </div>
                     </div>
 
-                    <div v-if="durationBreakdown.extraHours > 0" class="mt-3 rounded-lg bg-amber-500/10 p-2.5 text-xs text-amber-700 dark:text-amber-300 flex justify-between items-center">
-                        <span>Rincian Sewa: Pokok ({{ rupiah(durationBreakdown.basePrice) }}) + Lebihan {{ durationBreakdown.extraHours }} jam ({{ rupiah(durationBreakdown.overtimeFee) }})</span>
-                        <span class="font-semibold">{{ rupiah(booking.total_price) }}</span>
-                    </div>
-
-                    <div v-if="Number(booking.late_fee_total) > 0" class="mt-3 rounded-lg bg-destructive/10 p-3 text-destructive text-sm flex justify-between items-center">
-                        <span>Denda Telat Pengembalian Unit:</span>
-                        <span class="font-bold">+{{ rupiah(booking.late_fee_total) }}</span>
-                    </div>
-                </div>
-
-                <!-- Verifikasi Pembayaran -->
-                <div class="rounded-xl border bg-card p-5 shadow-xs">
-                    <h2 class="text-base font-semibold mb-3">Verifikasi Pembayaran</h2>
-                    <div v-if="!booking.payments || booking.payments.length === 0" class="text-sm text-muted-foreground py-4 text-center border rounded-lg">
-                        Pelanggan belum mengunggah bukti pembayaran.
-                    </div>
-
-                    <div v-else class="flex flex-col gap-4">
-                        <div
-                            v-for="pay in booking.payments"
-                            :key="pay.id"
-                            class="flex flex-col gap-3 rounded-lg border p-4 sm:flex-row sm:items-center sm:justify-between"
-                        >
-                            <div class="flex items-start gap-4">
-                                <a v-if="pay.proof_url" :href="pay.proof_url" target="_blank" class="shrink-0">
-                                    <img :src="pay.proof_url" alt="Bukti transfer" class="h-16 w-20 rounded-md border object-cover" />
-                                </a>
-                                <div>
-                                    <div class="flex items-center gap-2">
-                                        <span class="font-bold uppercase text-xs tracking-wider">{{ pay.type }}</span>
-                                        <Badge :variant="pay.status === 'verified' ? 'default' : pay.status === 'rejected' ? 'destructive' : 'secondary'">
-                                            {{ pay.status }}
-                                        </Badge>
-                                    </div>
-                                    <div class="text-lg font-bold text-primary">{{ rupiah(pay.amount) }}</div>
-                                    <div class="text-xs text-muted-foreground">
-                                        Metode: {{ pay.payment_method?.label ?? '-' }} · Diunggah: {{ formatDateTime(pay.created_at) }}
-                                    </div>
-                                    <div v-if="pay.verified_by" class="text-xs text-muted-foreground mt-1">
-                                        Diverifikasi oleh {{ pay.verified_by?.name }} ({{ formatDateTime(pay.verified_at) }})
-                                    </div>
-                                </div>
-                            </div>
-
-                            <div v-if="pay.status === 'pending'" class="flex gap-2 shrink-0">
-                                <Button size="sm" class="bg-emerald-600 hover:bg-emerald-700 text-white" @click="verifyPayment(pay.id, 'verify')">
-                                    Setujui (Verify)
-                                </Button>
-                                <Button size="sm" variant="destructive" @click="verifyPayment(pay.id, 'reject')">
-                                    Tolak
-                                </Button>
-                            </div>
+                    <div class="mt-4 pt-3 border-t border-border space-y-2 text-xs">
+                        <div class="flex justify-between">
+                            <span class="text-muted-foreground">Durasi Dasar:</span>
+                            <span>{{ durationBreakdown.days }} Hari &times; {{ rupiah(pricePerDay) }}</span>
+                        </div>
+                        <div v-if="durationBreakdown.extraHours > 0" class="flex justify-between text-amber-700 dark:text-amber-400">
+                            <span>Kelebihan Jam:</span>
+                            <span>{{ durationBreakdown.extraHours }} Jam &times; {{ rupiah(lateFeePerHour) }}</span>
+                        </div>
+                        <div v-if="Number(booking.late_fee_total) > 0" class="flex justify-between text-destructive">
+                            <span>Denda Keterlambatan Real:</span>
+                            <span>{{ rupiah(booking.late_fee_total) }}</span>
+                        </div>
+                        <div class="flex justify-between font-semibold text-sm pt-2 border-t border-border text-foreground">
+                            <span>Total Tagihan:</span>
+                            <span class="text-primary">{{ rupiah(booking.total_price) }}</span>
                         </div>
                     </div>
                 </div>
 
-                <!-- Penugasan Pengiriman -->
-                <div class="rounded-xl border bg-card p-5 shadow-xs">
-                    <h2 class="text-base font-semibold mb-3">Penugasan Pengiriman Unit</h2>
-                    <form class="flex flex-col gap-4" @submit.prevent="submitAssign">
-                        <div class="grid gap-2 sm:grid-cols-2">
-                            <div>
-                                <Label for="employee">Pilih Pegawai Pengantar</Label>
-                                <select
-                                    id="employee"
-                                    v-model="assignForm.employee_id"
-                                    class="h-9 w-full rounded-md border border-input bg-background px-3 text-sm shadow-xs outline-none focus-visible:ring-1 focus-visible:ring-ring mt-1"
-                                >
-                                    <option value="">-- Pilih Pegawai --</option>
-                                    <option v-for="emp in employees" :key="emp.id" :value="emp.id">
-                                        {{ emp.name }} — {{ emp.active_tasks > 0 ? emp.active_tasks + ' tugas aktif' : 'Tersedia' }} ({{ emp.phone ?? '-' }})
-                                    </option>
-                                </select>
-                            </div>
-                            <div>
-                                <Label for="notes">Catatan untuk Petugas</Label>
-                                <Input id="notes" v-model="assignForm.notes" placeholder="Contoh: Titip kunci di satpam atau serahkan langsung" class="mt-1" />
-                            </div>
-                        </div>
+                <!-- Pembayaran -->
+                <div class="rounded-[6px] border border-border bg-card p-4">
+                    <h2 class="text-sm font-semibold tracking-tight text-foreground mb-3 pb-2 border-b border-border">
+                        Riwayat Pembayaran
+                    </h2>
 
-                        <div class="flex items-center justify-between border-t pt-3">
-                            <span v-if="booking.delivery" class="text-xs text-muted-foreground">
-                                Status Pengiriman: <strong>{{ booking.delivery.status }}</strong>
-                            </span>
-                            <span v-else class="text-xs text-amber-600">
-                                Belum ada pegawai yang ditugaskan.
-                            </span>
-                            <Button type="submit" size="sm" :disabled="assignForm.processing">
-                                Simpan Penugasan
-                            </Button>
-                        </div>
-                    </form>
+                    <div v-if="!booking.payments || booking.payments.length === 0" class="p-4 text-center">
+                        <EmptyState
+                            title="Belum ada pembayaran"
+                            description="Pelanggan belum mengunggah bukti pembayaran untuk booking ini."
+                        />
+                    </div>
 
-                    <!-- Foto Pengiriman dari Pegawai -->
-                    <div v-if="booking.delivery?.photos && booking.delivery.photos.length > 0" class="mt-5 border-t pt-4">
-                        <h3 class="text-sm font-semibold mb-3">Foto Kondisi Unit dari Pegawai</h3>
-                        <div class="grid grid-cols-2 gap-3 sm:grid-cols-3">
-                            <div v-for="p in booking.delivery.photos" :key="p.id" class="rounded-lg border p-2">
-                                <a :href="p.photo_url" target="_blank">
-                                    <img :src="p.photo_url" class="h-24 w-full rounded object-cover" />
-                                </a>
-                                <div class="mt-1 text-xs font-semibold uppercase">{{ p.stage }}</div>
-                                <div class="text-[11px] text-muted-foreground">{{ p.note ?? '-' }}</div>
-                            </div>
-                        </div>
+                    <div v-else class="overflow-x-auto">
+                        <table class="w-full text-left text-xs">
+                            <thead class="border-b border-border bg-muted/40 text-muted-foreground font-semibold">
+                                <tr>
+                                    <th class="p-2.5">Tipe</th>
+                                    <th class="p-2.5">Jumlah</th>
+                                    <th class="p-2.5">Metode</th>
+                                    <th class="p-2.5">Bukti</th>
+                                    <th class="p-2.5">Status</th>
+                                    <th class="p-2.5 text-right">Aksi Verifikasi</th>
+                                </tr>
+                            </thead>
+                            <tbody class="divide-y divide-border">
+                                <tr v-for="pay in booking.payments" :key="pay.id" class="hover:bg-muted/30">
+                                    <td class="p-2.5 uppercase font-medium">{{ pay.type }}</td>
+                                    <td class="p-2.5 font-medium whitespace-nowrap">{{ rupiah(pay.amount) }}</td>
+                                    <td class="p-2.5 text-muted-foreground">{{ pay.payment_method?.label ?? '-' }}</td>
+                                    <td class="p-2.5">
+                                        <a
+                                            v-if="pay.proof_url"
+                                            :href="pay.proof_url"
+                                            target="_blank"
+                                            class="text-primary hover:underline font-medium text-xs"
+                                        >
+                                            Lihat Bukti
+                                        </a>
+                                        <span v-else class="text-muted-foreground">-</span>
+                                    </td>
+                                    <td class="p-2.5 whitespace-nowrap">
+                                        <StatusBadge :status="pay.status" />
+                                    </td>
+                                    <td class="p-2.5 text-right whitespace-nowrap">
+                                        <div v-if="pay.status === 'pending'" class="flex justify-end gap-1.5">
+                                            <Button
+                                                size="sm"
+                                                class="h-8 text-xs bg-emerald-700 hover:bg-emerald-800 text-white"
+                                                @click="verifyPayment(pay.id, 'verify')"
+                                            >
+                                                Setujui
+                                            </Button>
+                                            <Button
+                                                variant="destructive"
+                                                size="sm"
+                                                class="h-8 text-xs"
+                                                @click="verifyPayment(pay.id, 'reject')"
+                                            >
+                                                Tolak
+                                            </Button>
+                                        </div>
+                                        <span v-else class="text-[11px] text-muted-foreground">
+                                            {{ pay.status === 'verified' ? 'Telah diverifikasi' : 'Ditolak' }}
+                                        </span>
+                                    </td>
+                                </tr>
+                            </tbody>
+                        </table>
                     </div>
                 </div>
 
                 <!-- Kerusakan & Denda Tambahan -->
-                <div class="rounded-xl border bg-card p-5 shadow-xs">
-                    <h2 class="text-base font-semibold mb-3">Pencatatan Kerusakan & Denda</h2>
-                    
-                    <div v-if="booking.damages && booking.damages.length > 0" class="flex flex-col gap-2 mb-4">
-                        <div v-for="d in booking.damages" :key="d.id" class="flex justify-between items-center rounded-lg border p-3 text-sm">
+                <div class="rounded-[6px] border border-border bg-card p-4">
+                    <h2 class="text-sm font-semibold tracking-tight text-foreground mb-3 pb-2 border-b border-border">
+                        Catatan Kerusakan & Denda
+                    </h2>
+
+                    <div v-if="booking.damages && booking.damages.length > 0" class="mb-4 divide-y divide-border rounded-[6px] border border-border">
+                        <div v-for="dmg in booking.damages" :key="dmg.id" class="p-3 text-xs flex justify-between items-center">
                             <div>
-                                <div class="font-medium">{{ d.description }}</div>
-                                <div class="text-xs text-muted-foreground">Dinilai oleh: {{ d.assessed_by?.name }}</div>
+                                <div class="font-medium text-foreground">{{ dmg.description }}</div>
+                                <div class="text-[11px] text-muted-foreground">Dicatat oleh: {{ dmg.assessed_by_user?.name ?? 'Pegawai' }}</div>
                             </div>
-                            <div class="font-bold text-destructive">{{ rupiah(d.fine_amount) }}</div>
+                            <span class="font-medium text-destructive">{{ rupiah(dmg.fine_amount) }}</span>
                         </div>
                     </div>
 
-                    <form class="grid gap-3 sm:grid-cols-3 items-end border-t pt-3" @submit.prevent="submitDamage">
+                    <form class="grid gap-3 sm:grid-cols-3" @submit.prevent="submitDamage">
                         <div class="sm:col-span-2">
-                            <Label for="damage_desc">Deskripsi Kerusakan</Label>
-                            <Input id="damage_desc" v-model="damageForm.description" placeholder="Contoh: Lecet bumper depan kanan" class="mt-1" />
+                            <Label for="damage_desc" class="text-xs">Deskripsi Kerusakan</Label>
+                            <Input
+                                id="damage_desc"
+                                v-model="damageForm.description"
+                                placeholder="Contoh: Lecet bemper depan sebelah kanan"
+                                class="h-10 min-h-[40px] text-xs mt-1"
+                            />
+                            <InputError :message="damageForm.errors.description" />
                         </div>
                         <div>
-                            <Label for="fine">Nominal Denda (Rp)</Label>
-                            <Input id="fine" v-model="damageForm.fine_amount" type="number" placeholder="250000" class="mt-1" />
+                            <Label for="fine_amount" class="text-xs">Nominal Denda (Rp)</Label>
+                            <Input
+                                id="fine_amount"
+                                v-model="damageForm.fine_amount"
+                                type="number"
+                                placeholder="500000"
+                                class="h-10 min-h-[40px] text-xs mt-1"
+                            />
+                            <InputError :message="damageForm.errors.fine_amount" />
                         </div>
-                        <div class="sm:col-span-3 flex justify-end">
-                            <Button type="submit" variant="destructive" size="sm" :disabled="damageForm.processing">
-                                Tambah Denda Kerusakan
+                        <div class="sm:col-span-3">
+                            <Button
+                                type="submit"
+                                size="sm"
+                                class="h-10 min-h-[40px]"
+                                :disabled="damageForm.processing"
+                            >
+                                <Spinner v-if="damageForm.processing" class="mr-2" />
+                                Catat Denda Kerusakan
                             </Button>
                         </div>
                     </form>
                 </div>
+
+                <!-- Peta Pelacakan Lokasi -->
+                <div class="rounded-[6px] border border-border bg-card p-4">
+                    <h2 class="text-sm font-semibold tracking-tight text-foreground mb-3 pb-2 border-b border-border">
+                        Pelacakan Lokasi Terakhir
+                    </h2>
+                    <div
+                        v-if="booking.location_logs && booking.location_logs.length > 0"
+                        ref="mapEl"
+                        class="h-64 w-full rounded-[6px] border border-border"
+                    ></div>
+                    <div v-else class="p-6 text-center">
+                        <EmptyState
+                            title="Belum ada data GPS"
+                            description="Titik lokasi akan terekam secara berkala saat kendaraan berstatus sedang disewa (on_rent)."
+                        />
+                    </div>
+                </div>
             </div>
         </div>
-
-        <ConfirmDialog
-            :open="confirmOpen"
-            :title="confirmTitle"
-            :description="confirmDescription"
-            :variant="confirmVariant"
-            :confirm-text="confirmText"
-            @update:open="confirmOpen = $event"
-            @confirm="handleConfirmedAction"
-        />
     </div>
+
+    <ConfirmDialog
+        :open="confirmOpen"
+        :title="confirmTitle"
+        :description="confirmDescription"
+        :variant="confirmVariant"
+        :confirm-text="confirmText"
+        @update:open="confirmOpen = $event"
+        @confirm="handleConfirmedAction"
+    />
 </template>

@@ -6,15 +6,13 @@ import {
     Car,
     CheckCircle2,
     Clock,
-    CreditCard,
-    DollarSign,
-    ShieldAlert,
     Truck,
-    UserCheck,
     Users,
 } from '@lucide/vue';
 import { computed } from 'vue';
-import { Badge } from '@/components/ui/badge';
+import EmptyState from '@/components/EmptyState.vue';
+import PageHeader from '@/components/PageHeader.vue';
+import StatusBadge from '@/components/StatusBadge.vue';
 import { Button } from '@/components/ui/button';
 import { formatDateTime, rupiah } from '@/lib/format';
 
@@ -53,28 +51,6 @@ defineOptions({
     },
 });
 
-const statusLabel: Record<string, string> = {
-    pending_dp: 'Menunggu DP',
-    booked: 'Terkonfirmasi',
-    assigned: 'Siap Kirim',
-    delivering: 'Sedang Dikirim',
-    on_rent: 'Sedang Disewa',
-    returned: 'Kembali (Cek Denda)',
-    completed: 'Selesai',
-    cancelled: 'Dibatalkan',
-};
-
-const statusVariant: Record<string, 'default' | 'secondary' | 'destructive' | 'outline'> = {
-    pending_dp: 'secondary',
-    booked: 'default',
-    assigned: 'default',
-    delivering: 'default',
-    on_rent: 'default',
-    returned: 'outline',
-    completed: 'outline',
-    cancelled: 'destructive',
-};
-
 const pendingDpBooking = computed(() => {
     return props.active_bookings?.find((b: any) => b.status === 'pending_dp');
 });
@@ -83,158 +59,151 @@ const pendingDpBooking = computed(() => {
 <template>
     <Head title="Dashboard" />
 
-    <div class="flex flex-col gap-6 p-4">
-        <!-- Header Sambutan -->
-        <div class="flex flex-col justify-between gap-3 rounded-2xl bg-gradient-to-r from-slate-900 via-slate-800 to-indigo-950 p-6 text-white shadow-sm sm:flex-row sm:items-center">
-            <div>
-                <span class="rounded-full bg-white/10 px-3 py-1 text-xs font-medium uppercase tracking-wider text-slate-200">
-                    Peran: {{ role?.toUpperCase() }}
-                </span>
-                <h1 class="mt-2 text-2xl font-bold">Halo, {{ auth?.name }}!</h1>
-                <p class="mt-1 text-sm text-slate-300">
-                    Selamat datang di Sistem Manajemen Rental Mobil.
-                </p>
-            </div>
-            <div class="flex flex-wrap gap-2">
-                <Button v-if="role === 'admin'" as-child variant="secondary" size="sm">
-                    <Link href="/admin/bookings">Lihat Semua Booking</Link>
+    <div class="flex flex-col gap-6 p-4 sm:p-6">
+        <!-- Page Header -->
+        <PageHeader
+            :title="`Dashboard ${role === 'admin' ? 'Admin' : role === 'pegawai' ? 'Pegawai' : 'Pelanggan'}`"
+            :description="`Selamat datang, ${auth?.name}. Ringkasan operasional dan aktivitas rental mobil.`"
+        >
+            <template #actions>
+                <Button v-if="role === 'admin'" as-child size="sm">
+                    <Link href="/admin/bookings">Kelola Booking</Link>
                 </Button>
-                <Button v-else-if="role === 'pegawai'" as-child variant="secondary" size="sm">
-                    <Link href="/pegawai/deliveries">Lihat Tugas Saya</Link>
+                <Button v-else-if="role === 'pegawai'" as-child size="sm">
+                    <Link href="/pegawai/deliveries">Tugas Pengiriman</Link>
                 </Button>
-                <Button v-else as-child variant="secondary" size="sm">
-                    <Link href="/vehicles">Sewa Kendaraan Sekarang</Link>
+                <Button v-else as-child size="sm">
+                    <Link href="/vehicles">Katalog Kendaraan</Link>
                 </Button>
-            </div>
-        </div>
+            </template>
+        </PageHeader>
 
         <!-- Peringatan Masa Sewa Berakhir (Admin & Pegawai) -->
-        <div v-if="(props.overdue_rentals?.length ?? 0) > 0" class="flex flex-col gap-2 rounded-xl border border-destructive/40 bg-destructive/10 p-4 text-destructive">
+        <div
+            v-if="(props.overdue_rentals?.length ?? 0) > 0"
+            class="flex flex-col gap-2 rounded-[6px] border border-destructive/40 bg-destructive/10 p-4 text-destructive"
+        >
             <div class="flex items-center gap-2 font-semibold text-sm">
-                <AlertCircle class="h-5 w-5 shrink-0" />
-                <span>Pemberitahuan: Terdapat {{ props.overdue_rentals?.length }} unit sewa yang telah melewati batas waktu (harus segera dijemput)!</span>
+                <AlertCircle class="h-4 w-4 shrink-0" />
+                <span>Pemberitahuan: Ada {{ props.overdue_rentals?.length }} sewa yang telah melewati batas waktu pengembalian.</span>
             </div>
             <div class="flex flex-wrap gap-2 pt-1">
                 <Link
                     v-for="b in props.overdue_rentals"
                     :key="b.id"
                     :href="role === 'admin' ? `/admin/bookings/${b.id}` : `/pegawai/deliveries/${b.delivery?.id ?? ''}`"
-                    class="inline-flex items-center gap-1.5 rounded-md border border-destructive/30 bg-background px-3 py-1 text-xs font-semibold text-foreground hover:bg-muted"
+                    class="inline-flex items-center gap-2 rounded-[6px] border border-destructive/30 bg-background px-3 py-1.5 text-xs font-medium text-foreground hover:bg-muted"
                 >
-                    <span>{{ b.booking_code }} · {{ b.vehicle?.brand }} {{ b.vehicle?.model }} ({{ b.user?.name }})</span>
-                    <span class="text-destructive font-mono">Batas: {{ formatDateTime(b.return_at) }} ↗</span>
+                    <span>{{ b.booking_code }} &middot; {{ b.vehicle?.brand }} {{ b.vehicle?.model }} ({{ b.user?.name }})</span>
+                    <span class="text-destructive font-mono text-[11px]">Batas: {{ formatDateTime(b.return_at) }}</span>
                 </Link>
             </div>
         </div>
 
         <!-- ======================= TAMPILAN ADMIN ======================= -->
         <div v-if="role === 'admin'" class="flex flex-col gap-6">
-            <!-- Statistik Utama -->
-            <div class="grid gap-4 sm:grid-cols-2 lg:grid-cols-4">
-                <div class="flex items-center gap-4 rounded-xl border bg-card p-4 shadow-xs">
-                    <div class="rounded-xl bg-blue-100 p-3 text-blue-700 dark:bg-blue-900/40 dark:text-blue-400">
-                        <Car class="h-6 w-6" />
+            <!-- Statistik Operasional Admin -->
+            <div class="grid gap-3 sm:grid-cols-2 lg:grid-cols-4">
+                <div class="rounded-[6px] border border-border bg-card p-4">
+                    <div class="flex items-center justify-between text-muted-foreground mb-1">
+                        <span class="text-xs font-semibold uppercase tracking-wider">Kendaraan</span>
+                        <Car class="size-4 text-primary" />
                     </div>
-                    <div>
-                        <div class="text-[11px] font-medium text-muted-foreground uppercase tracking-wider">Total Kendaraan</div>
-                        <div class="text-2xl font-bold">{{ props.stats?.total_vehicles ?? 0 }}</div>
-                        <div class="text-xs text-muted-foreground">
-                            {{ props.stats?.available_vehicles ?? 0 }} Di Garasi · {{ props.stats?.rented_vehicles ?? 0 }} Keluar
-                        </div>
+                    <div class="text-2xl font-bold tracking-tight text-foreground">{{ props.stats?.total_vehicles ?? 0 }}</div>
+                    <div class="mt-1 text-xs text-muted-foreground">
+                        {{ props.stats?.available_vehicles ?? 0 }} di garasi &middot; {{ props.stats?.rented_vehicles ?? 0 }} keluar
                     </div>
                 </div>
 
-                <div class="flex items-center gap-4 rounded-xl border bg-card p-4 shadow-xs">
-                    <div class="rounded-xl bg-amber-100 p-3 text-amber-700 dark:bg-amber-900/40 dark:text-amber-400">
-                        <Clock class="h-6 w-6" />
+                <div class="rounded-[6px] border border-border bg-card p-4">
+                    <div class="flex items-center justify-between text-muted-foreground mb-1">
+                        <span class="text-xs font-semibold uppercase tracking-wider">Total Booking</span>
+                        <Clock class="size-4 text-primary" />
                     </div>
-                    <div>
-                        <div class="text-[11px] font-medium text-muted-foreground uppercase tracking-wider">Total Booking</div>
-                        <div class="text-2xl font-bold">{{ props.stats?.total_bookings ?? 0 }}</div>
-                        <div class="text-xs text-muted-foreground">
-                            {{ props.stats?.pending_payments ?? 0 }} Menunggu Verifikasi
-                        </div>
+                    <div class="text-2xl font-bold tracking-tight text-foreground">{{ props.stats?.total_bookings ?? 0 }}</div>
+                    <div class="mt-1 text-xs text-muted-foreground">
+                        {{ props.stats?.pending_payments ?? 0 }} menunggu verifikasi bayar
                     </div>
                 </div>
 
-                <div class="flex items-center gap-4 rounded-xl border bg-card p-4 shadow-xs">
-                    <div class="rounded-xl bg-emerald-100 p-3 text-emerald-700 dark:bg-emerald-900/40 dark:text-emerald-400">
-                        <Truck class="h-6 w-6" />
+                <div class="rounded-[6px] border border-border bg-card p-4">
+                    <div class="flex items-center justify-between text-muted-foreground mb-1">
+                        <span class="text-xs font-semibold uppercase tracking-wider">Sewa Aktif</span>
+                        <Truck class="size-4 text-primary" />
                     </div>
-                    <div>
-                        <div class="text-[11px] font-medium text-muted-foreground uppercase tracking-wider">Sewa Aktif</div>
-                        <div class="text-2xl font-bold">{{ props.stats?.active_rentals ?? 0 }}</div>
-                        <div class="text-xs text-muted-foreground">Sedang Disewa (On Rent)</div>
+                    <div class="text-2xl font-bold tracking-tight text-foreground">{{ props.stats?.active_rentals ?? 0 }}</div>
+                    <div class="mt-1 text-xs text-muted-foreground">
+                        Unit sedang digunakan pelanggan
                     </div>
                 </div>
 
-                <div class="flex items-center gap-4 rounded-xl border bg-card p-4 shadow-xs">
-                    <div class="rounded-xl bg-purple-100 p-3 text-purple-700 dark:bg-purple-900/40 dark:text-purple-400">
-                        <Users class="h-6 w-6" />
+                <div class="rounded-[6px] border border-border bg-card p-4">
+                    <div class="flex items-center justify-between text-muted-foreground mb-1">
+                        <span class="text-xs font-semibold uppercase tracking-wider">Pengguna</span>
+                        <Users class="size-4 text-primary" />
                     </div>
-                    <div>
-                        <div class="text-[11px] font-medium text-muted-foreground uppercase tracking-wider">Pelanggan</div>
-                        <div class="text-2xl font-bold">{{ props.stats?.total_customers ?? 0 }}</div>
-                        <div class="text-xs text-muted-foreground">
-                            {{ props.stats?.total_employees ?? 0 }} Pegawai · {{ props.stats?.blacklisted_customers ?? 0 }} Blacklist
-                        </div>
+                    <div class="text-2xl font-bold tracking-tight text-foreground">{{ props.stats?.total_customers ?? 0 }}</div>
+                    <div class="mt-1 text-xs text-muted-foreground">
+                        {{ props.stats?.total_employees ?? 0 }} pegawai &middot; {{ props.stats?.blacklisted_customers ?? 0 }} blacklist
                     </div>
                 </div>
             </div>
 
-            <!-- Booking Terkini -->
-            <div class="flex flex-col gap-3 rounded-xl border bg-card p-5">
-                <div class="flex items-center justify-between">
+            <!-- Tabel Booking Terkini -->
+            <div class="rounded-[6px] border border-border bg-card">
+                <div class="flex items-center justify-between p-4 border-b border-border">
                     <div>
-                        <h2 class="text-lg font-semibold">Pesanan Booking Terbaru</h2>
-                        <p class="text-xs text-muted-foreground">Daftar transaksi sewa yang baru masuk</p>
+                        <h2 class="text-sm font-semibold tracking-tight text-foreground">Pesanan Booking Terbaru</h2>
+                        <p class="text-xs text-muted-foreground">Daftar transaksi booking yang baru masuk</p>
                     </div>
                     <Button as-child variant="outline" size="sm">
-                        <Link href="/admin/bookings">Kelola Semua</Link>
+                        <Link href="/admin/bookings">Lihat Semua</Link>
                     </Button>
                 </div>
 
-                <div class="overflow-x-auto rounded-lg border">
-                    <table class="w-full text-sm">
-                        <thead class="bg-muted/50 text-left">
+                <div class="overflow-x-auto">
+                    <table class="w-full text-left text-xs">
+                        <thead class="border-b border-border bg-muted/40 text-muted-foreground font-semibold">
                             <tr>
-                                <th class="p-3">Kode Booking</th>
+                                <th class="p-3">Kode</th>
                                 <th class="p-3">Pelanggan</th>
                                 <th class="p-3">Kendaraan</th>
-                                <th class="p-3">Durasi</th>
-                                <th class="p-3">Total Harga</th>
+                                <th class="p-3">Jadwal Ambil</th>
+                                <th class="p-3">Total Biaya</th>
                                 <th class="p-3">Status</th>
                                 <th class="p-3 text-right">Aksi</th>
                             </tr>
                         </thead>
-                        <tbody>
+                        <tbody class="divide-y divide-border">
                             <tr v-if="!props.recent_bookings || props.recent_bookings.length === 0">
-                                <td colspan="7" class="p-6 text-center text-muted-foreground">
-                                    Belum ada transaksi booking.
+                                <td colspan="7" class="p-6 text-center">
+                                    <EmptyState
+                                        title="Belum ada data booking"
+                                        description="Transaksi booking yang masuk akan ditampilkan pada tabel ini."
+                                    />
                                 </td>
                             </tr>
-                            <tr v-for="b in props.recent_bookings" :key="b.id" class="border-t">
+                            <tr v-for="b in props.recent_bookings" :key="b.id" class="hover:bg-muted/30 transition-colors">
                                 <td class="p-3 font-mono font-medium">{{ b.booking_code }}</td>
                                 <td class="p-3">
-                                    <div class="font-medium">{{ b.user?.name }}</div>
-                                    <div class="text-xs text-muted-foreground">{{ b.user?.phone ?? b.user?.email }}</div>
+                                    <div class="font-medium text-foreground">{{ b.user?.name }}</div>
+                                    <div class="text-[11px] text-muted-foreground">{{ b.user?.phone ?? b.user?.email }}</div>
                                 </td>
                                 <td class="p-3">
-                                    {{ b.vehicle?.brand }} {{ b.vehicle?.model }}
-                                    <span class="block text-xs text-muted-foreground font-mono">{{ b.vehicle?.plate }}</span>
+                                    <div class="font-medium text-foreground">{{ b.vehicle?.brand }} {{ b.vehicle?.model }}</div>
+                                    <div class="text-[11px] text-muted-foreground font-mono">{{ b.vehicle?.plate }}</div>
                                 </td>
-                                <td class="p-3">
-                                    <div>{{ b.duration_days }} Hari</div>
-                                    <div class="text-xs text-muted-foreground">{{ formatDateTime(b.pickup_at) }}</div>
+                                <td class="p-3 text-muted-foreground whitespace-nowrap">
+                                    {{ formatDateTime(b.pickup_at) }}
                                 </td>
-                                <td class="p-3 font-medium">{{ rupiah(b.total_price) }}</td>
-                                <td class="p-3">
-                                    <Badge :variant="statusVariant[b.status] ?? 'outline'">
-                                        {{ statusLabel[b.status] ?? b.status }}
-                                    </Badge>
+                                <td class="p-3 font-medium text-foreground whitespace-nowrap">
+                                    {{ rupiah(b.total_price) }}
                                 </td>
-                                <td class="p-3 text-right">
-                                    <Button as-child variant="ghost" size="sm">
+                                <td class="p-3 whitespace-nowrap">
+                                    <StatusBadge :status="b.status" />
+                                </td>
+                                <td class="p-3 text-right whitespace-nowrap">
+                                    <Button as-child variant="ghost" size="sm" class="h-8 text-xs">
                                         <Link :href="`/admin/bookings/${b.id}`">Detail</Link>
                                     </Button>
                                 </td>
@@ -247,173 +216,187 @@ const pendingDpBooking = computed(() => {
 
         <!-- ======================= TAMPILAN PEGAWAI ======================= -->
         <div v-else-if="role === 'pegawai'" class="flex flex-col gap-6">
-            <div class="grid gap-4 sm:grid-cols-2">
-                <div class="flex items-center gap-4 rounded-xl border bg-card p-5">
-                    <div class="rounded-xl bg-blue-100 p-3 text-blue-700 dark:bg-blue-900/40">
-                        <Truck class="h-6 w-6" />
+            <div class="grid gap-3 sm:grid-cols-2">
+                <div class="rounded-[6px] border border-border bg-card p-4">
+                    <div class="flex items-center justify-between text-muted-foreground mb-1">
+                        <span class="text-xs font-semibold uppercase tracking-wider">Tugas Aktif</span>
+                        <Truck class="size-4 text-primary" />
                     </div>
-                    <div>
-                        <div class="text-2xl font-bold">{{ props.stats?.active_tasks ?? 0 }}</div>
-                        <div class="text-sm text-muted-foreground">Tugas Pengiriman / Penjemputan Aktif</div>
-                    </div>
+                    <div class="text-2xl font-bold tracking-tight text-foreground">{{ props.stats?.active_tasks ?? 0 }}</div>
+                    <div class="mt-1 text-xs text-muted-foreground">Tugas pengiriman atau penjemputan berjalan</div>
                 </div>
 
-                <div class="flex items-center gap-4 rounded-xl border bg-card p-5">
-                    <div class="rounded-xl bg-emerald-100 p-3 text-emerald-700 dark:bg-emerald-900/40">
-                        <CheckCircle2 class="h-6 w-6" />
+                <div class="rounded-[6px] border border-border bg-card p-4">
+                    <div class="flex items-center justify-between text-muted-foreground mb-1">
+                        <span class="text-xs font-semibold uppercase tracking-wider">Tugas Selesai</span>
+                        <CheckCircle2 class="size-4 text-emerald-600" />
                     </div>
-                    <div>
-                        <div class="text-2xl font-bold">{{ props.stats?.completed_tasks ?? 0 }}</div>
-                        <div class="text-sm text-muted-foreground">Tugas Selesai (Kembali ke Garasi)</div>
-                    </div>
+                    <div class="text-2xl font-bold tracking-tight text-foreground">{{ props.stats?.completed_tasks ?? 0 }}</div>
+                    <div class="mt-1 text-xs text-muted-foreground">Unit telah kembali ke garasi</div>
                 </div>
             </div>
 
-            <div class="flex flex-col gap-3 rounded-xl border bg-card p-5">
-                <div class="flex items-center justify-between">
+            <div class="rounded-[6px] border border-border bg-card">
+                <div class="flex items-center justify-between p-4 border-b border-border">
                     <div>
-                        <h2 class="text-lg font-semibold">Tugas Pengiriman Anda</h2>
-                        <p class="text-xs text-muted-foreground">Segera konfirmasi dan lakukan pengantaran unit ke pelanggan</p>
+                        <h2 class="text-sm font-semibold tracking-tight text-foreground">Tugas Pengiriman Anda</h2>
+                        <p class="text-xs text-muted-foreground">Daftar unit yang harus dikirim atau diambil</p>
                     </div>
                     <Button as-child variant="outline" size="sm">
-                        <Link href="/pegawai/deliveries">Lihat Semua Tugas</Link>
+                        <Link href="/pegawai/deliveries">Semua Tugas</Link>
                     </Button>
                 </div>
 
-                <div v-if="!props.assigned_deliveries || props.assigned_deliveries.length === 0" class="rounded-lg border p-8 text-center text-muted-foreground">
-                    Tidak ada tugas pengiriman aktif saat ini.
+                <div v-if="!props.assigned_deliveries || props.assigned_deliveries.length === 0" class="p-6">
+                    <EmptyState
+                        title="Tidak ada tugas aktif"
+                        description="Saat ini Anda tidak memiliki tugas pengiriman yang menunggu tindakan."
+                    />
                 </div>
 
-                <div v-else class="grid gap-3 sm:grid-cols-2">
-                    <div
-                        v-for="del in props.assigned_deliveries"
-                        :key="del.id"
-                        class="flex flex-col justify-between rounded-xl border p-4 shadow-xs"
-                    >
-                        <div class="flex flex-col gap-2">
-                            <div class="flex items-center justify-between">
-                                <span class="font-mono text-xs font-semibold">{{ del.booking?.booking_code }}</span>
-                                <Badge variant="outline">{{ del.status }}</Badge>
-                            </div>
-                            <div class="font-semibold">{{ del.booking?.vehicle?.brand }} {{ del.booking?.vehicle?.model }} ({{ del.booking?.vehicle?.plate }})</div>
-                            <div class="text-xs text-muted-foreground">
-                                <strong>Penyewa:</strong> {{ del.booking?.user?.name }} ({{ del.booking?.user?.phone }})
-                            </div>
-                            <div class="text-xs text-muted-foreground">
-                                <strong>Alamat:</strong> {{ del.booking?.delivery_address }}
-                            </div>
-                        </div>
-                        <div class="mt-4 flex justify-end">
-                            <Button as-child size="sm">
-                                <Link :href="`/pegawai/deliveries/${del.id}`">Proses Pengiriman</Link>
-                            </Button>
-                        </div>
-                    </div>
+                <div v-else class="overflow-x-auto">
+                    <table class="w-full text-left text-xs">
+                        <thead class="border-b border-border bg-muted/40 text-muted-foreground font-semibold">
+                            <tr>
+                                <th class="p-3">Kode Booking</th>
+                                <th class="p-3">Kendaraan</th>
+                                <th class="p-3">Pelanggan</th>
+                                <th class="p-3">Alamat Antar</th>
+                                <th class="p-3">Status</th>
+                                <th class="p-3 text-right">Aksi</th>
+                            </tr>
+                        </thead>
+                        <tbody class="divide-y divide-border">
+                            <tr v-for="del in props.assigned_deliveries" :key="del.id" class="hover:bg-muted/30 transition-colors">
+                                <td class="p-3 font-mono font-medium">{{ del.booking?.booking_code }}</td>
+                                <td class="p-3">
+                                    <div class="font-medium text-foreground">{{ del.booking?.vehicle?.brand }} {{ del.booking?.vehicle?.model }}</div>
+                                    <div class="text-[11px] text-muted-foreground font-mono">{{ del.booking?.vehicle?.plate }}</div>
+                                </td>
+                                <td class="p-3">
+                                    <div class="font-medium text-foreground">{{ del.booking?.user?.name }}</div>
+                                    <div class="text-[11px] text-muted-foreground">{{ del.booking?.user?.phone }}</div>
+                                </td>
+                                <td class="p-3 text-muted-foreground max-w-xs truncate">
+                                    {{ del.booking?.delivery_address }}
+                                </td>
+                                <td class="p-3 whitespace-nowrap">
+                                    <StatusBadge :status="del.status" />
+                                </td>
+                                <td class="p-3 text-right whitespace-nowrap">
+                                    <Button as-child size="sm" class="h-8 text-xs">
+                                        <Link :href="`/pegawai/deliveries/${del.id}`">Proses</Link>
+                                    </Button>
+                                </td>
+                            </tr>
+                        </tbody>
+                    </table>
                 </div>
             </div>
         </div>
 
         <!-- ======================= TAMPILAN PELANGGAN ======================= -->
         <div v-else class="flex flex-col gap-6">
-            <!-- Banner Perhatian Booking Menunggu DP -->
+            <!-- Banner Perhatian DP -->
             <div
                 v-if="pendingDpBooking"
-                class="flex flex-col justify-between gap-3 rounded-xl border border-amber-500/40 bg-amber-500/10 p-4 text-amber-900 dark:text-amber-200 sm:flex-row sm:items-center"
+                class="flex flex-col justify-between gap-3 rounded-[6px] border border-amber-600/30 bg-amber-50 dark:bg-amber-950/40 p-4 text-amber-900 dark:text-amber-200 sm:flex-row sm:items-center"
             >
                 <div class="flex items-center gap-3">
-                    <AlertCircle class="h-6 w-6 shrink-0 text-amber-600 dark:text-amber-400" />
+                    <AlertCircle class="size-5 shrink-0 text-amber-600 dark:text-amber-400" />
                     <div>
-                        <div class="font-bold text-sm">Menunggu Pembayaran DP (Uang Muka)</div>
-                        <div class="text-xs text-amber-800 dark:text-amber-300">
-                            Booking <strong>{{ pendingDpBooking.booking_code }}</strong> ({{ pendingDpBooking.vehicle?.brand }} {{ pendingDpBooking.vehicle?.model }}) ditahan selama 24 jam. Segera selesaikan pembayaran agar unit terkunci.
+                        <div class="font-semibold text-sm">Menunggu Pembayaran Uang Muka (DP)</div>
+                        <div class="text-xs text-amber-800 dark:text-amber-300 mt-0.5">
+                            Booking <strong>{{ pendingDpBooking.booking_code }}</strong> ({{ pendingDpBooking.vehicle?.brand }} {{ pendingDpBooking.vehicle?.model }}) ditahan 24 jam. Selesaikan pembayaran DP agar unit terkunci.
                         </div>
                     </div>
                 </div>
-                <Button as-child size="sm" class="bg-amber-600 hover:bg-amber-700 text-white shrink-0">
+                <Button as-child size="sm" class="shrink-0 bg-primary hover:bg-primary/90 text-primary-foreground">
                     <Link :href="`/bookings/${pendingDpBooking.id}`">Bayar DP Sekarang</Link>
                 </Button>
             </div>
 
-            <div class="grid gap-4 sm:grid-cols-2">
-                <div class="flex items-center gap-4 rounded-xl border bg-card p-5">
-                    <div class="rounded-xl bg-indigo-100 p-3 text-indigo-700 dark:bg-indigo-900/40">
-                        <Car class="h-6 w-6" />
+            <!-- Statistik Pelanggan -->
+            <div class="grid gap-3 sm:grid-cols-2">
+                <div class="rounded-[6px] border border-border bg-card p-4">
+                    <div class="flex items-center justify-between text-muted-foreground mb-1">
+                        <span class="text-xs font-semibold uppercase tracking-wider">Booking Berjalan</span>
+                        <Car class="size-4 text-primary" />
                     </div>
-                    <div>
-                        <div class="text-2xl font-bold">{{ props.stats?.active_count ?? 0 }}</div>
-                        <div class="text-sm text-muted-foreground">Booking Sedang Berjalan</div>
-                    </div>
+                    <div class="text-2xl font-bold tracking-tight text-foreground">{{ props.stats?.active_count ?? 0 }}</div>
+                    <div class="mt-1 text-xs text-muted-foreground">Pesanan yang sedang aktif</div>
                 </div>
 
-                <div class="flex items-center gap-4 rounded-xl border bg-card p-5">
-                    <div class="rounded-xl bg-emerald-100 p-3 text-emerald-700 dark:bg-emerald-900/40">
-                        <CheckCircle2 class="h-6 w-6" />
+                <div class="rounded-[6px] border border-border bg-card p-4">
+                    <div class="flex items-center justify-between text-muted-foreground mb-1">
+                        <span class="text-xs font-semibold uppercase tracking-wider">Sewa Selesai</span>
+                        <CheckCircle2 class="size-4 text-emerald-600" />
                     </div>
-                    <div>
-                        <div class="text-2xl font-bold">{{ props.stats?.completed_count ?? 0 }}</div>
-                        <div class="text-sm text-muted-foreground">Sewa Berhasil Diselesaikan</div>
-                    </div>
+                    <div class="text-2xl font-bold tracking-tight text-foreground">{{ props.stats?.completed_count ?? 0 }}</div>
+                    <div class="mt-1 text-xs text-muted-foreground">Riwayat rental yang berhasil diselesaikan</div>
                 </div>
             </div>
 
-            <!-- Booking Berjalan -->
-            <div class="flex flex-col gap-3 rounded-xl border bg-card p-5">
-                <div class="flex items-center justify-between">
+            <!-- Pesanan Aktif Pelanggan -->
+            <div class="rounded-[6px] border border-border bg-card">
+                <div class="flex items-center justify-between p-4 border-b border-border">
                     <div>
-                        <h2 class="text-lg font-semibold">Pesanan Aktif Anda</h2>
-                        <p class="text-xs text-muted-foreground">Pantau status konfirmasi DP, jadwal kirim, dan masa sewa</p>
+                        <h2 class="text-sm font-semibold tracking-tight text-foreground">Pesanan Aktif Anda</h2>
+                        <p class="text-xs text-muted-foreground">Status pemesanan, verifikasi, dan jadwal sewa kendaraan</p>
                     </div>
                     <Button as-child variant="outline" size="sm">
                         <Link href="/bookings">Semua Pesanan</Link>
                     </Button>
                 </div>
 
-                <div v-if="!props.active_bookings || props.active_bookings.length === 0" class="rounded-lg border p-8 text-center text-muted-foreground">
-                    Belum ada pesanan aktif. Silakan pilih mobil impian Anda di katalog!
-                    <div class="mt-3">
-                        <Button as-child>
+                <div v-if="!props.active_bookings || props.active_bookings.length === 0" class="p-6">
+                    <EmptyState
+                        title="Belum ada pesanan aktif"
+                        description="Pilih kendaraan yang tersedia di katalog untuk memulai booking rental mobil."
+                    >
+                        <Button as-child size="sm" class="mt-2">
                             <Link href="/vehicles">Buka Katalog Kendaraan</Link>
                         </Button>
-                    </div>
+                    </EmptyState>
                 </div>
 
-                <div v-else class="grid gap-4 sm:grid-cols-2">
-                    <div
-                        v-for="b in props.active_bookings"
-                        :key="b.id"
-                        class="flex flex-col justify-between rounded-xl border p-4 shadow-xs"
-                    >
-                        <div>
-                            <div class="flex items-center justify-between">
-                                <span class="font-mono text-xs text-muted-foreground">{{ b.booking_code }}</span>
-                                <Badge :variant="statusVariant[b.status] ?? 'outline'">
-                                    {{ statusLabel[b.status] ?? b.status }}
-                                </Badge>
-                            </div>
-                            <h3 class="mt-2 text-base font-semibold">{{ b.vehicle?.brand }} {{ b.vehicle?.model }}</h3>
-                            <p class="text-xs text-muted-foreground">Tujuan: {{ b.destination }}</p>
-                            <p class="text-xs text-muted-foreground">
-                                Jadwal: {{ formatDateTime(b.pickup_at) }} s/d {{ formatDateTime(b.return_at) }}
-                            </p>
-                            <p class="mt-2 text-sm font-semibold text-primary">Total: {{ rupiah(b.total_price) }}</p>
-                        </div>
-
-                        <div class="mt-4 flex items-center justify-between border-t pt-3">
-                            <span v-if="b.status === 'pending_dp'" class="text-xs text-amber-600 font-medium">
-                                Silakan upload bukti bayar DP
-                            </span>
-                            <span v-else-if="b.status === 'on_rent'" class="text-xs text-emerald-600 font-medium">
-                                Unit sedang Anda sewa
-                            </span>
-                            <span v-else class="text-xs text-muted-foreground">
-                                Status: {{ statusLabel[b.status] }}
-                            </span>
-
-                            <Button as-child size="sm">
-                                <Link :href="`/bookings/${b.id}`">Detail & Bayar</Link>
-                            </Button>
-                        </div>
-                    </div>
+                <div v-else class="overflow-x-auto">
+                    <table class="w-full text-left text-xs">
+                        <thead class="border-b border-border bg-muted/40 text-muted-foreground font-semibold">
+                            <tr>
+                                <th class="p-3">Kode Booking</th>
+                                <th class="p-3">Kendaraan</th>
+                                <th class="p-3">Tujuan</th>
+                                <th class="p-3">Jadwal Sewa</th>
+                                <th class="p-3">Total Biaya</th>
+                                <th class="p-3">Status</th>
+                                <th class="p-3 text-right">Aksi</th>
+                            </tr>
+                        </thead>
+                        <tbody class="divide-y divide-border">
+                            <tr v-for="b in props.active_bookings" :key="b.id" class="hover:bg-muted/30 transition-colors">
+                                <td class="p-3 font-mono font-medium">{{ b.booking_code }}</td>
+                                <td class="p-3 font-medium text-foreground">
+                                    {{ b.vehicle?.brand }} {{ b.vehicle?.model }}
+                                </td>
+                                <td class="p-3 text-muted-foreground">{{ b.destination }}</td>
+                                <td class="p-3 text-muted-foreground whitespace-nowrap">
+                                    {{ formatDateTime(b.pickup_at) }} s/d {{ formatDateTime(b.return_at) }}
+                                </td>
+                                <td class="p-3 font-medium text-foreground whitespace-nowrap">
+                                    {{ rupiah(b.total_price) }}
+                                </td>
+                                <td class="p-3 whitespace-nowrap">
+                                    <StatusBadge :status="b.status" />
+                                </td>
+                                <td class="p-3 text-right whitespace-nowrap">
+                                    <Button as-child size="sm" class="h-8 text-xs">
+                                        <Link :href="`/bookings/${b.id}`">Detail & Bayar</Link>
+                                    </Button>
+                                </td>
+                            </tr>
+                        </tbody>
+                    </table>
                 </div>
             </div>
         </div>

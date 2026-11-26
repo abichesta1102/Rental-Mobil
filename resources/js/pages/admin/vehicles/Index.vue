@@ -1,7 +1,5 @@
 <script setup lang="ts">
 import { Head, Link, router } from '@inertiajs/vue3';
-import { ref } from 'vue';
-import ConfirmDialog from '@/components/ConfirmDialog.vue';
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
 
@@ -34,11 +32,9 @@ interface Paginator {
 
 defineProps<{ vehicles: Paginator }>();
 
-defineOptions({
-    layout: {
-        breadcrumbs: [{ title: 'Kendaraan', href: '/admin/vehicles' }],
-    },
-});
+const breadcrumbs: BreadcrumbItem[] = [
+    { title: 'Kendaraan', href: '/admin/vehicles' },
+];
 
 const statusLabel = {
     available: 'Tersedia',
@@ -60,23 +56,9 @@ function rupiah(value: string | number): string {
     }).format(Number(value));
 }
 
-const confirmOpen = ref(false);
-const vehicleToDelete = ref<Vehicle | null>(null);
-
 function remove(vehicle: Vehicle): void {
-    vehicleToDelete.value = vehicle;
-    confirmOpen.value = true;
-}
-
-function handleConfirmDelete(): void {
-    if (vehicleToDelete.value) {
-        router.delete(`/admin/vehicles/${vehicleToDelete.value.id}`, {
-            preserveScroll: true,
-            onFinish: () => {
-                confirmOpen.value = false;
-                vehicleToDelete.value = null;
-            },
-        });
+    if (confirm(`Hapus kendaraan ${vehicle.brand} ${vehicle.model} (${vehicle.plate})?`)) {
+        router.delete(`/admin/vehicles/${vehicle.id}`, { preserveScroll: true });
     }
 }
 </script>
@@ -84,7 +66,8 @@ function handleConfirmDelete(): void {
 <template>
     <Head title="Kendaraan" />
 
-    <div class="flex flex-col gap-4 p-4">
+    <AppLayout :breadcrumbs="breadcrumbs">
+        <div class="flex flex-col gap-4 p-4">
             <div class="flex items-center justify-between">
                 <div>
                     <h1 class="text-xl font-semibold">Data Kendaraan</h1>
@@ -173,14 +156,5 @@ function handleConfirmDelete(): void {
                 </template>
             </nav>
         </div>
-
-        <ConfirmDialog
-            :open="confirmOpen"
-            title="Hapus Kendaraan"
-            :description="`Apakah Anda yakin ingin menghapus data kendaraan ${vehicleToDelete?.brand} ${vehicleToDelete?.model} (${vehicleToDelete?.plate})? Tindakan ini menggunakan soft-delete.`"
-            variant="destructive"
-            confirm-text="Ya, Hapus"
-            @update:open="confirmOpen = $event"
-            @confirm="handleConfirmDelete"
-        />
+    </AppLayout>
 </template>

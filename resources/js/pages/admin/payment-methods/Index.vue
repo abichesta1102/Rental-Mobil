@@ -2,10 +2,14 @@
 import { Head, useForm } from '@inertiajs/vue3';
 import { ref } from 'vue';
 import ConfirmDialog from '@/components/ConfirmDialog.vue';
-import { Badge } from '@/components/ui/badge';
+import EmptyState from '@/components/EmptyState.vue';
+import InputError from '@/components/InputError.vue';
+import PageHeader from '@/components/PageHeader.vue';
+import StatusBadge from '@/components/StatusBadge.vue';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
+import { Spinner } from '@/components/ui/spinner';
 
 interface PaymentMethod {
     id: number;
@@ -26,7 +30,6 @@ defineOptions({
 });
 
 const isCreating = ref(false);
-
 const confirmOpen = ref(false);
 const selectedMethod = ref<PaymentMethod | null>(null);
 
@@ -74,80 +77,127 @@ function handleConfirmDelete(): void {
 <template>
     <Head title="Metode Pembayaran" />
 
-    <div class="flex flex-col gap-6 p-4">
-        <div class="flex flex-col justify-between gap-3 sm:flex-row sm:items-center">
-            <div>
-                <h1 class="text-xl font-semibold">Metode Pembayaran</h1>
-                <p class="text-sm text-muted-foreground">
-                    Atur rekening transfer dan QRIS yang dapat dipilih pelanggan untuk pembayaran DP dan pelunasan.
-                </p>
-            </div>
-            <Button @click="isCreating = !isCreating">
-                {{ isCreating ? 'Batal' : '+ Tambah Metode' }}
-            </Button>
-        </div>
+    <div class="flex flex-col gap-6 p-4 sm:p-6">
+        <PageHeader
+            title="Metode Pembayaran"
+            description="Atur rekening transfer bank dan kode QRIS untuk pembayaran uang muka dan pelunasan sewa."
+        >
+            <template #actions>
+                <Button size="sm" @click="isCreating = !isCreating">
+                    {{ isCreating ? 'Batal' : '+ Tambah Metode' }}
+                </Button>
+            </template>
+        </PageHeader>
 
         <!-- Form Tambah -->
-        <div v-if="isCreating" class="rounded-xl border bg-card p-5 shadow-xs">
-            <h2 class="text-base font-semibold mb-4">Tambah Metode Pembayaran Baru</h2>
+        <div v-if="isCreating" class="rounded-[6px] border border-border bg-card p-5">
+            <h2 class="text-sm font-semibold tracking-tight text-foreground mb-4 pb-2 border-b border-border">
+                Tambah Metode Pembayaran Baru
+            </h2>
             <form class="grid gap-4 sm:grid-cols-2" @submit.prevent="submit">
                 <div>
                     <Label for="type">Tipe Pembayaran</Label>
                     <select
                         id="type"
                         v-model="form.type"
-                        class="h-9 w-full rounded-md border border-input bg-background px-3 text-sm shadow-xs outline-none focus-visible:ring-1 focus-visible:ring-ring mt-1"
+                        class="h-10 min-h-[40px] w-full rounded-[6px] border border-input bg-background px-3 text-sm shadow-none outline-none focus-visible:ring-[2px] focus-visible:ring-ring mt-1"
                     >
                         <option value="bank_transfer">Transfer Bank</option>
                         <option value="qris">QRIS (Scan Barcode)</option>
                     </select>
+                    <InputError :message="form.errors.type" />
                 </div>
 
                 <div>
                     <Label for="label">Nama / Label Metode</Label>
-                    <Input id="label" v-model="form.label" placeholder="Contoh: BCA Transfer atau QRIS Utama" class="mt-1" />
+                    <Input
+                        id="label"
+                        v-model="form.label"
+                        placeholder="Contoh: BCA Transfer atau QRIS Toko"
+                        class="h-10 min-h-[40px] mt-1"
+                    />
+                    <InputError :message="form.errors.label" />
                 </div>
 
                 <template v-if="form.type === 'bank_transfer'">
                     <div>
                         <Label for="acc_num">Nomor Rekening</Label>
-                        <Input id="acc_num" v-model="form.account_number" placeholder="Contoh: 1234567890" class="mt-1" />
+                        <Input
+                            id="acc_num"
+                            v-model="form.account_number"
+                            placeholder="Contoh: 1234567890"
+                            class="h-10 min-h-[40px] font-mono mt-1"
+                        />
+                        <InputError :message="form.errors.account_number" />
                     </div>
                     <div>
-                        <Label for="acc_name">Nama Pemilik Rekening (A.N.)</Label>
-                        <Input id="acc_name" v-model="form.account_name" placeholder="Contoh: PT Rental Mobil" class="mt-1" />
+                        <Label for="acc_name">Atas Nama (A.N.)</Label>
+                        <Input
+                            id="acc_name"
+                            v-model="form.account_name"
+                            placeholder="Contoh: PT Rental Mobil Utama"
+                            class="h-10 min-h-[40px] mt-1"
+                        />
+                        <InputError :message="form.errors.account_name" />
                     </div>
                 </template>
 
                 <div v-if="form.type === 'qris'" class="sm:col-span-2">
                     <Label for="qris_img">Gambar Barcode QRIS</Label>
-                    <Input id="qris_img" type="file" accept="image/*" class="mt-1" @change="onQrisChange" />
+                    <Input
+                        id="qris_img"
+                        type="file"
+                        accept="image/*"
+                        class="h-10 min-h-[40px] mt-1 cursor-pointer"
+                        @change="onQrisChange"
+                    />
+                    <InputError :message="form.errors.qris_image" />
                 </div>
 
-                <div class="sm:col-span-2 flex justify-end gap-2 border-t pt-3">
-                    <Button type="button" variant="outline" @click="isCreating = false">Batal</Button>
-                    <Button type="submit" :disabled="form.processing">Simpan Metode</Button>
+                <div class="sm:col-span-2 flex justify-end gap-2 border-t border-border pt-4">
+                    <Button type="button" variant="outline" class="h-10 min-h-[40px]" @click="isCreating = false">
+                        Batal
+                    </Button>
+                    <Button type="submit" class="h-10 min-h-[40px]" :disabled="form.processing">
+                        <Spinner v-if="form.processing" class="mr-2" />
+                        Simpan Metode
+                    </Button>
                 </div>
             </form>
         </div>
 
         <!-- Grid Metode Pembayaran -->
-        <div class="grid gap-4 sm:grid-cols-2 lg:grid-cols-3">
-            <div v-for="m in methods" :key="m.id" class="flex flex-col justify-between rounded-xl border bg-card p-5 shadow-xs">
+        <div v-if="methods.length === 0" class="rounded-[6px] border border-border bg-card p-6">
+            <EmptyState
+                title="Belum ada metode pembayaran"
+                description="Tambahkan rekening transfer bank atau QRIS agar pelanggan dapat melakukan pembayaran."
+            >
+                <Button size="sm" class="mt-2" @click="isCreating = true">
+                    Tambah Metode Pertama
+                </Button>
+            </EmptyState>
+        </div>
+
+        <div v-else class="grid gap-4 sm:grid-cols-2 lg:grid-cols-3">
+            <div
+                v-for="m in methods"
+                :key="m.id"
+                class="flex flex-col justify-between rounded-[6px] border border-border bg-card p-4 transition-colors"
+            >
                 <div>
                     <div class="flex items-center justify-between mb-2">
-                        <Badge :variant="m.type === 'qris' ? 'default' : 'secondary'">
+                        <span class="rounded-[4px] border border-border bg-muted/60 px-2 py-0.5 text-[11px] font-semibold uppercase tracking-wider text-muted-foreground">
                             {{ m.type === 'qris' ? 'QRIS' : 'Transfer Bank' }}
-                        </Badge>
-                        <span class="text-xs text-emerald-600 font-semibold" v-if="m.is_active">Aktif</span>
+                        </span>
+                        <StatusBadge :status="m.is_active ? 'active' : 'inactive'" class="scale-90 origin-right" />
                     </div>
 
-                    <h3 class="text-lg font-semibold">{{ m.label }}</h3>
+                    <h3 class="text-sm font-semibold tracking-tight text-foreground">{{ m.label }}</h3>
 
-                    <div v-if="m.type === 'bank_transfer'" class="mt-2 text-sm">
-                        <div class="text-xs text-muted-foreground">Nomor Rekening:</div>
-                        <div class="font-mono font-bold text-base">{{ m.account_number }}</div>
-                        <div class="text-xs text-muted-foreground mt-1">A.N. {{ m.account_name }}</div>
+                    <div v-if="m.type === 'bank_transfer'" class="mt-3 text-xs space-y-1">
+                        <div class="text-muted-foreground text-[11px]">Nomor Rekening:</div>
+                        <div class="font-mono font-bold text-sm text-foreground">{{ m.account_number }}</div>
+                        <div class="text-muted-foreground text-[11px]">A.N. {{ m.account_name }}</div>
                     </div>
 
                     <div v-if="m.type === 'qris'" class="mt-3">
@@ -155,16 +205,18 @@ function handleConfirmDelete(): void {
                             v-if="m.qris_image_url"
                             :src="m.qris_image_url"
                             alt="QRIS"
-                            class="h-36 w-36 object-contain rounded-lg border mx-auto"
+                            class="h-32 w-32 object-contain rounded-[4px] border border-border mx-auto bg-white p-1"
                         />
-                        <div v-else class="h-28 flex items-center justify-center border rounded-lg bg-muted text-xs text-muted-foreground">
-                            Belum ada gambar barcode QRIS
+                        <div v-else class="h-24 flex items-center justify-center border border-border rounded-[4px] bg-muted text-xs text-muted-foreground">
+                            Tanpa gambar barcode
                         </div>
                     </div>
                 </div>
 
-                <div class="mt-5 flex justify-end border-t pt-3">
-                    <Button variant="destructive" size="sm" @click="remove(m)">Hapus</Button>
+                <div class="mt-4 flex justify-end border-t border-border pt-3">
+                    <Button variant="destructive" size="sm" class="h-8 text-xs" @click="remove(m)">
+                        Hapus
+                    </Button>
                 </div>
             </div>
         </div>

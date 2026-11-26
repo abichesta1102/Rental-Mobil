@@ -11,22 +11,22 @@ import { update } from '@/routes/password';
 
 defineOptions({
     layout: {
-        title: 'Reset password',
-        description: 'Please enter your new password below',
+        title: 'Atur Ulang Kata Sandi',
+        description: 'Masukkan kata sandi baru Anda di bawah ini',
     },
 });
 
 const props = defineProps<{
     token: string;
     email: string;
-    passwordRules: string;
+    passwordRules?: string;
 }>();
 
 const inputEmail = ref(props.email);
 </script>
 
 <template>
-    <Head title="Reset password" />
+    <Head title="Atur Ulang Kata Sandi" />
 
     <Form
         v-bind="update.form()"
@@ -34,43 +34,41 @@ const inputEmail = ref(props.email);
         :reset-on-success="['password', 'password_confirmation']"
         v-slot="{ errors, processing }"
     >
-        <div class="grid gap-6">
+        <div class="grid gap-5">
             <div class="grid gap-2">
-                <Label for="email">Email</Label>
+                <Label for="email">Alamat Email</Label>
                 <Input
                     id="email"
                     type="email"
                     name="email"
                     autocomplete="email"
                     v-model="inputEmail"
-                    class="mt-1 block w-full"
+                    class="h-10 min-h-[40px] bg-muted/30"
                     readonly
                 />
-                <InputError :message="errors.email" class="mt-2" />
+                <InputError :message="errors.email" />
             </div>
 
             <div class="grid gap-2">
-                <Label for="password">Password</Label>
+                <Label for="password">Kata Sandi Baru</Label>
                 <PasswordInput
                     id="password"
                     name="password"
                     autocomplete="new-password"
-                    class="mt-1 block w-full"
                     autofocus
-                    placeholder="Password"
+                    placeholder="Minimal 8 karakter"
                     :passwordrules="passwordRules"
                 />
                 <InputError :message="errors.password" />
             </div>
 
             <div class="grid gap-2">
-                <Label for="password_confirmation"> Confirm password </Label>
+                <Label for="password_confirmation">Konfirmasi Kata Sandi</Label>
                 <PasswordInput
                     id="password_confirmation"
                     name="password_confirmation"
                     autocomplete="new-password"
-                    class="mt-1 block w-full"
-                    placeholder="Confirm password"
+                    placeholder="Ulangi kata sandi baru"
                     :passwordrules="passwordRules"
                 />
                 <InputError :message="errors.password_confirmation" />
@@ -78,12 +76,12 @@ const inputEmail = ref(props.email);
 
             <Button
                 type="submit"
-                class="mt-4 w-full"
+                class="mt-2 w-full h-10 min-h-[40px]"
                 :disabled="processing"
                 data-test="reset-password-button"
             >
-                <Spinner v-if="processing" />
-                Reset password
+                <Spinner v-if="processing" class="mr-2" />
+                Simpan Kata Sandi Baru
             </Button>
         </div>
     </Form>
